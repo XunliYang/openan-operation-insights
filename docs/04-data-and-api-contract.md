@@ -1,0 +1,734 @@
+# 04 · 数据模型与接口契约
+
+> 依赖文档：`02-frontend-design.md`、`03-backend-design.md`
+> 定位：本文档是前后端协作的**唯一契约来源**。任何字段新增、改名、类型变更都必须先更新本文档。
+
+---
+
+## 1. 数据文件总览
+
+| 文件 | 顶层结构 | 承载内容 | 记录量级 |
+| --- | --- | --- | --- |
+| `data/home.json` | `JsonFileEnvelope<HomeFileData>` | 首页四项指标 + 下一次会议引用 | 1 |
+| `data/organizations.json` | `JsonFileEnvelope<Organization[]>` | 组织档案（伙伴 / 外部开发者 / 社区） | 数十 |
+| `data/contributions.json` | `JsonFileEnvelope<OrganizationContribution[]>` | GitHub 维度贡献 | 数十 |
+| `data/insights.json` | `JsonFileEnvelope<OrganizationInsight[]>` | Confluence 维度贡献 | 数十 |
+| `data/meetings.json` | `JsonFileEnvelope<MeetingDetail[]>` | 会议时间线与详情 | 十余 |
+
+### 1.1 通用文件信封
+
+所有数据文件统一结构，便于版本演进与校验：
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": []
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `schemaVersion` | number | ✅ | 数据结构版本。结构发生不兼容变更时 +1，加载器据此决定是否兼容或拒绝 |
+| `updatedAt` | string (ISO 8601, UTC) | ✅ | 该文件最后更新时间，用于前端展示"数据更新时间" |
+| `data` | object \| array | ✅ | 实际业务数据，结构见第 3 节 |
+
+### 1.2 数据关联关系
+
+```mermaid
+erDiagram
+  ORGANIZATION ||--o| CONTRIBUTION : "orgId"
+  ORGANIZATION ||--o| INSIGHT : "orgId"
+  ORGANIZATION }o--o{ MEETING : "attendingOrganizations"
+  HOME_FILE }o--|| MEETING : "nextMeetingId"
+
+  ORGANIZATION {
+    string orgId PK
+    string name
+    string logoUrl
+    string type
+  }
+  CONTRIBUTION {
+    string orgId FK
+    number pullRequests
+    number issues
+    number linesChanged
+  }
+  INSIGHT {
+    string orgId FK
+    number requirements
+    number bestPractices
+    number deployments
+  }
+  MEETING {
+    string id PK
+    string name
+    string startDate
+    string[] attendingOrganizations
+  }
+```
+
+**关联规则**：
+
+- `Organization.orgId` 是全局唯一主键，`contributions.json` / `insights.json` / `meetings.attendingOrganizations` 均以它关联。
+- 允许"有组织但无贡献记录"（新加入、暂未贡献）：此时接口返回该组织，指标补 `0`。
+- 允许"有贡献记录但组织档案缺失"：`Service` 层以贡献记录内的 `orgName`/`logoUrl` 兜底，并记录 `WARN` 日志提示数据维护缺失。
+- `attendingOrganizations` **存组织名称字符串**（便于人工维护可读性），`Service` 层负责按 `name`/`aliases` 反查 `orgId` 以便跳转。
+
+---
+
+## 2. 主键与命名规范
+
+| 实体 | 主键 | 格式 | 示例 |
+| --- | --- | --- | --- |
+| 组织 | `orgId` | kebab-case，与 GitHub 组织名对齐（小写） | `openan-labs` |
+| 会议 | `id` | kebab-case + 年份 | `openan-summit-2026` |
+
+**时间规范**：
+- 所有时间字段均为 **ISO 8601 UTC** 字符串（带 `Z`），如 `"2026-09-18T09:00:00Z"`。
+- 仅日期语义的字段（如会议起止日）同样使用完整时间字符串，`00:00:00Z` 表示当天开始。
+- **时区展示由前端负责**（本地化格式化），后端不做时区转换。
+
+**命名规范**：
+- JSON 与 API 字段统一 `camelCase`。
+- 布尔字段 `is` / `has` 前缀。
+- 数组字段使用复数名词（`tags`、`outcomes`）。
+- 计数字段使用具体名词而非 `count` 后缀堆叠（`pullRequests`、`requirements`）。
+
+---
+
+## 3. 实体定义
+
+### 3.1 `Organization`（组织档案）
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `orgId` | string | ✅ | 主键，kebab-case |
+| `name` | string | ✅ | 展示名称 |
+| `logoUrl` | string | ✅ | Logo 地址，对应 GitHub `avatar_url`；为空字符串时前端降级为首字母色块 |
+| `homepageUrl` | string | ✅ | 主页地址，对应 GitHub `html_url` |
+| `type` | `'partner' \| 'external' \| 'community'` | ✅ | 组织类型：伙伴单位 / 外部开发者 / 社区组织 |
+| `tags` | string[] | ✅ | 标签，如 `["伙伴单位", "芯片"]`；可为空数组 |
+| `aliases` | Record<string, string> | ❌ | 多数据源别名映射，如 `{ "github": "OpenAN-Labs", "confluence": "OpenAN Labs" }`。**阶段三归并贡献数据的关键字段** |
+| `joinedAt` | string | ❌ | 加入社区时间，用于"新增伙伴"类统计 |
+| `description` | string | ❌ | 一句话简介，用于组织卡片悬浮提示 |
+
+### 3.2 `OrganizationContribution`（GitHub 维度贡献）
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `orgId` | string | ✅ | 关联 `Organization.orgId` |
+| `orgName` | string | ✅ | 冗余展示名（档案缺失时兜底） |
+| `logoUrl` | string | ✅ | 冗余 Logo |
+| `homepageUrl` | string | ✅ | 冗余主页 |
+| `github.pullRequests` | number | ✅ | **已合并** PR 数 |
+| `github.issues` | number | ✅ | 提出或参与的 Issue 数 |
+| `github.linesChanged` | number | ✅ | `additions + deletions` 汇总 |
+| `github.repos` | number | ✅ | 参与仓库数 |
+| `updatedAt` | string | ✅ | 该条记录更新时间 |
+
+> **口径声明**（必须在前端 UI 上可查）：
+> - `pullRequests` 仅统计**已合并**（merged）的 PR，不含 open / closed-unmerged。
+> - `linesChanged` 按 PR 的 `additions + deletions` 累加，**含**文档与配置文件改动；二进制文件与生成代码**不计入**。
+> - 统计范围限定为 OpenAN 组织下的仓库，且通过 `GITHUB_REPOS` 白名单可进一步收窄。
+
+### 3.3 `OrganizationInsight`（Confluence 维度贡献）
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `orgId` | string | ✅ | 关联 `Organization.orgId` |
+| `orgName` | string | ✅ | 冗余展示名 |
+| `logoUrl` | string | ✅ | 冗余 Logo |
+| `confluence.requirements` | number | ✅ | 在 Confluence 提交/承接的需求条数 |
+| `confluence.bestPractices` | number | ✅ | best-practice 案例数 |
+| `confluence.deployments` | number | ✅ | 局点数（已落地的部署实例） |
+| `updatedAt` | string | ✅ | 该条记录更新时间 |
+
+> **"局点"定义**：需求在客户侧完成部署并稳定运行的实例。同一需求在多个局点落地时**分别计数**。
+
+### 3.4 `HomeSummary`（首页概览）
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `partnerCount` | `MetricValue` | ✅ | 社区伙伴数量 |
+| `externalDeveloperCount` | `MetricValue` | ✅ | 外部开发者数量 |
+| `meetingCount` | `MetricValue` | ✅ | 参加的会议总数 |
+| `useCaseCount` | `MetricValue` | ✅ | 已提供的应用案例数 |
+| `nextMeeting` | `MeetingSummary \| null` | ✅ | 下一次会议；无未来会议时为 `null` |
+| `updatedAt` | string | ✅ | 整体数据更新时间 |
+
+`MetricValue` 结构：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `value` | number | ✅ | 指标数值 |
+| `unit` | string | ❌ | 单位，如 `"家"`、`"人"`、`"场"`、`"个"` |
+| `delta` | number | ❌ | 环比变化量（正负均可） |
+| `deltaDirection` | `'up' \| 'down' \| 'flat'` | ❌ | 变化方向，用于颜色与箭头。缺失时前端不展示角标 |
+
+### 3.5 `MeetingSummary` 与 `MeetingDetail`
+
+`MeetingSummary`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | ✅ | 主键 |
+| `name` | string | ✅ | 会议名称 |
+| `startDate` | string | ✅ | 开始时间（ISO 8601） |
+| `endDate` | string | ✅ | 结束时间（ISO 8601） |
+| `location` | string | ✅ | 地点，格式 `城市 · 场馆` |
+| `websiteUrl` | string | ✅ | 官网地址 |
+| `isUpcoming` | boolean | ✅ | 是否未结束 |
+
+`MeetingDetail` 在 `MeetingSummary` 基础上扩展：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `host` | string | ✅ | 主办方 |
+| `attendeeCount` | number | ✅ | 参会人数 |
+| `attendingOrganizations` | string[] | ✅ | 参会组织名称列表 |
+| `agendaHighlights` | string[] | ✅ | 议程要点 |
+| `outcomes` | string[] | ✅ | 会议成果 |
+| `minutesUrl` | string | ❌ | 会议纪要链接；缺失时前端展示 `—` |
+
+### 3.6 `HomeFileData`（`home.json` 的 `data` 结构）
+
+`home.json` 只存指标数值与下一次会议**引用**，不存会议对象本体，避免数据双份维护：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `partnerCount` | `MetricValue` | ✅ | 见 3.4 |
+| `externalDeveloperCount` | `MetricValue` | ✅ | 见 3.4 |
+| `meetingCount` | `MetricValue` | ✅ | 见 3.4 |
+| `useCaseCount` | `MetricValue` | ✅ | 见 3.4 |
+| `nextMeetingId` | string \| null | ✅ | 指向 `meetings.json` 中的会议 `id`；`Service` 据此组装 `nextMeeting` |
+
+> **`nextMeeting` 的推导规则**：优先使用 `nextMeetingId`；若未配置或指向的会议已结束，则自动从 `meetings.json` 中取 `endDate` 最晚且仍在未来的会议。两者都无则返回 `null`。此规则在 `MeetingService` 中实现，保证"下一次会议"随数据更新自动纠正。
+
+---
+
+## 4. 数据文件样例
+
+以下样例即为**本阶段的硬编码数据源**，实现时直接以此结构创建文件。所有样例数据均为示意值，可在维护时替换。
+
+### 4.1 `data/home.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": {
+    "partnerCount": { "value": 28, "unit": "家", "delta": 3, "deltaDirection": "up" },
+    "externalDeveloperCount": { "value": 412, "unit": "人", "delta": 26, "deltaDirection": "up" },
+    "meetingCount": { "value": 17, "unit": "场", "delta": 1, "deltaDirection": "up" },
+    "useCaseCount": { "value": 63, "unit": "个", "delta": 5, "deltaDirection": "up" },
+    "nextMeetingId": "openan-summit-2026"
+  }
+}
+```
+
+### 4.2 `data/organizations.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": [
+    {
+      "orgId": "openan-labs",
+      "name": "OpenAN Labs",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000001?v=4",
+      "homepageUrl": "https://github.com/openan-labs",
+      "type": "community",
+      "tags": ["社区组织", "核心维护"],
+      "aliases": { "github": "openan-labs", "confluence": "OpenAN Labs" },
+      "joinedAt": "2023-03-01T00:00:00Z",
+      "description": "OpenAN 社区发起方与核心仓库维护者。"
+    },
+    {
+      "orgId": "nova-silicon",
+      "name": "NovaSilicon",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000002?v=4",
+      "homepageUrl": "https://github.com/nova-silicon",
+      "type": "partner",
+      "tags": ["伙伴单位", "芯片", "驱动"],
+      "aliases": { "github": "nova-silicon", "confluence": "NovaSilicon 技术团队" },
+      "joinedAt": "2023-06-15T00:00:00Z",
+      "description": "提供 NPU 驱动与算子库适配，主导异构算力接入方案。"
+    },
+    {
+      "orgId": "harbor-cloud",
+      "name": "HarborCloud",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000003?v=4",
+      "homepageUrl": "https://github.com/harbor-cloud",
+      "type": "partner",
+      "tags": ["伙伴单位", "云原生", "调度"],
+      "aliases": { "github": "harbor-cloud", "confluence": "HarborCloud 云原生组" },
+      "joinedAt": "2024-01-20T00:00:00Z",
+      "description": "参与编排引擎与资源调度模块共建，贡献多集群部署实践。"
+    },
+    {
+      "orgId": "lumen-dev",
+      "name": "Lumen Dev",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000004?v=4",
+      "homepageUrl": "https://github.com/lumen-dev",
+      "type": "external",
+      "tags": ["外部开发者", "文档"],
+      "aliases": { "github": "lumen-dev", "confluence": "Lumen" },
+      "description": "独立开发者，长期贡献中文文档与快速上手指南。"
+    }
+  ]
+}
+```
+
+### 4.3 `data/contributions.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": [
+    {
+      "orgId": "openan-labs",
+      "orgName": "OpenAN Labs",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000001?v=4",
+      "homepageUrl": "https://github.com/openan-labs",
+      "github": { "pullRequests": 486, "issues": 212, "linesChanged": 318420, "repos": 24 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "nova-silicon",
+      "orgName": "NovaSilicon",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000002?v=4",
+      "homepageUrl": "https://github.com/nova-silicon",
+      "github": { "pullRequests": 173, "issues": 68, "linesChanged": 142880, "repos": 9 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "harbor-cloud",
+      "orgName": "HarborCloud",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000003?v=4",
+      "homepageUrl": "https://github.com/harbor-cloud",
+      "github": { "pullRequests": 121, "issues": 54, "linesChanged": 96540, "repos": 7 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "lumen-dev",
+      "orgName": "Lumen Dev",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000004?v=4",
+      "homepageUrl": "https://github.com/lumen-dev",
+      "github": { "pullRequests": 37, "issues": 19, "linesChanged": 21460, "repos": 3 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    }
+  ]
+}
+```
+
+### 4.4 `data/insights.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": [
+    {
+      "orgId": "openan-labs",
+      "orgName": "OpenAN Labs",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000001?v=4",
+      "confluence": { "requirements": 42, "bestPractices": 18, "deployments": 12 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "nova-silicon",
+      "orgName": "NovaSilicon",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000002?v=4",
+      "confluence": { "requirements": 26, "bestPractices": 11, "deployments": 9 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "harbor-cloud",
+      "orgName": "HarborCloud",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000003?v=4",
+      "confluence": { "requirements": 17, "bestPractices": 7, "deployments": 5 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "lumen-dev",
+      "orgName": "Lumen Dev",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000004?v=4",
+      "confluence": { "requirements": 4, "bestPractices": 3, "deployments": 1 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    }
+  ]
+}
+```
+
+### 4.5 `data/meetings.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": [
+    {
+      "id": "openan-summit-2026",
+      "name": "OpenAN Summit 2026",
+      "startDate": "2026-11-12T00:00:00Z",
+      "endDate": "2026-11-14T00:00:00Z",
+      "location": "上海 · 世博中心",
+      "websiteUrl": "https://openan.example.org/summit/2026",
+      "isUpcoming": true,
+      "host": "OpenAN 社区委员会",
+      "attendeeCount": 640,
+      "attendingOrganizations": [
+        "OpenAN Labs", "NovaSilicon", "HarborCloud", "Lumen Dev", "Ferro Systems", "Atlas Compute"
+      ],
+      "agendaHighlights": [
+        "异构算力统一接入方案年度进展",
+        "编排引擎 2.0 架构发布",
+        "社区治理与 SIG 运作机制升级"
+      ],
+      "outcomes": [
+        "发布编排引擎 2.0 路线图",
+        "新增 6 家伙伴单位签署共建协议"
+      ],
+      "minutesUrl": "https://openan.example.org/summit/2026/minutes"
+    },
+    {
+      "id": "openan-hackathon-2025",
+      "name": "OpenAN Developer Hackathon 2025",
+      "startDate": "2025-08-22T00:00:00Z",
+      "endDate": "2025-08-24T00:00:00Z",
+      "location": "深圳 · 南山科技园",
+      "websiteUrl": "https://openan.example.org/hackathon/2025",
+      "isUpcoming": false,
+      "host": "OpenAN Labs",
+      "attendeeCount": 218,
+      "attendingOrganizations": ["OpenAN Labs", "NovaSilicon", "HarborCloud", "Lumen Dev"],
+      "agendaHighlights": [
+        "NPU DRA 插件实战工作坊",
+        "社区贡献者闪电演讲",
+        "48 小时应用案例开发赛"
+      ],
+      "outcomes": [
+        "产出 23 个可运行的应用案例原型",
+        "12 名外部开发者成为常驻贡献者"
+      ],
+      "minutesUrl": "https://openan.example.org/hackathon/2025/minutes"
+    },
+    {
+      "id": "openan-plenary-2024",
+      "name": "OpenAN 社区全体会议 2024",
+      "startDate": "2024-05-16T00:00:00Z",
+      "endDate": "2024-05-17T00:00:00Z",
+      "location": "北京 · 国家会议中心",
+      "websiteUrl": "https://openan.example.org/plenary/2024",
+      "isUpcoming": false,
+      "host": "OpenAN 社区委员会",
+      "attendeeCount": 386,
+      "attendingOrganizations": ["OpenAN Labs", "NovaSilicon", "HarborCloud"],
+      "agendaHighlights": [
+        "社区年度工作报告",
+        "伙伴单位共建成果汇报",
+        "基础设施 SIG 成立动议"
+      ],
+      "outcomes": ["正式成立基础设施与调度两个 SIG"],
+      "minutesUrl": "https://openan.example.org/plenary/2024/minutes"
+    }
+  ]
+}
+```
+
+---
+
+## 5. REST 接口契约
+
+### 5.1 通用约定
+
+| 项 | 约定 |
+| --- | --- |
+| 基地址 | 同域部署为 `/api`；开发期由 Vite 代理 `/api` → `http://localhost:3000` |
+| 版本策略 | 路径中暂不带版本号。发生不兼容变更时改为 `/api/v2/...`，旧路径保留一个迭代周期 |
+| 请求方法 | 本阶段全部为 `GET`（只读看板），无写接口 |
+| 内容类型 | 响应 `application/json; charset=utf-8` |
+| 响应信封 | 统一 `{ code, message, data }`，`code = 0` 表示成功 |
+| 时间格式 | 请求与响应中的时间均为 ISO 8601 UTC 字符串 |
+| 分页 | 仅 `GET /api/meetings` 预留分页参数，其余接口数据量小、一次性返回 |
+| 排序 | 由后端给出业务默认排序（见各接口说明），前端可再对已获取数据做本地排序 |
+| 未知参数 | 返回 `40001`（`forbidNonWhitelisted`），避免拼写错误被静默忽略 |
+| 缓存头 | 响应包含 `Cache-Control: private, max-age=60`；数据陈旧时附加 `X-Data-Stale: true` |
+| 幂等性 | 全部 `GET`，天然幂等，前端可安全重试 |
+
+### 5.2 接口清单
+
+| # | 方法 | 路径 | 用途 | 主要使用页面 |
+| --- | --- | --- | --- | --- |
+| 1 | GET | `/api/home/summary` | 首页概览（四项指标 + 下一次会议） | 首页 |
+| 2 | GET | `/api/organizations` | 组织档案列表 | 首页（贡献组织）、社区活跃度（筛选） |
+| 3 | GET | `/api/contributions` | 组织 GitHub 维度贡献 | 社区活跃度 |
+| 4 | GET | `/api/insights` | 组织 Confluence 维度贡献 | 社区活跃度 |
+| 5 | GET | `/api/contributions/summary` | 贡献聚合总量与类型分布 | 社区活跃度（环形图） |
+| 6 | GET | `/api/meetings` | 会议列表（可含详情） | 参会情况 |
+| 7 | GET | `/api/meetings/:id` | 单场会议详情 | 参会情况（预留跳转） |
+
+### 5.3 接口详细定义
+
+#### 5.3.1 `GET /api/home/summary`
+
+**用途**：首页一次性获取全部概览数据。
+
+**请求参数**：无。
+
+**响应 `data`**：`HomeSummary`（见 3.4），其中 `nextMeeting` 为 `MeetingSummary`：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "partnerCount": { "value": 28, "unit": "家", "delta": 3, "deltaDirection": "up" },
+    "externalDeveloperCount": { "value": 412, "unit": "人", "delta": 26, "deltaDirection": "up" },
+    "meetingCount": { "value": 17, "unit": "场", "delta": 1, "deltaDirection": "up" },
+    "useCaseCount": { "value": 63, "unit": "个", "delta": 5, "deltaDirection": "up" },
+    "nextMeeting": {
+      "id": "openan-summit-2026",
+      "name": "OpenAN Summit 2026",
+      "startDate": "2026-11-12T00:00:00Z",
+      "endDate": "2026-11-14T00:00:00Z",
+      "location": "上海 · 世博中心",
+      "websiteUrl": "https://openan.example.org/summit/2026",
+      "isUpcoming": true
+    },
+    "updatedAt": "2026-09-18T09:00:00Z"
+  }
+}
+```
+
+**失败场景**：`50001`（`home.json` 结构损坏）。
+
+---
+
+#### 5.3.2 `GET /api/organizations`
+
+**用途**：获取组织档案。首页用于渲染"贡献的组织"卡片墙；社区活跃度页用于组织筛选下拉。
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `scope` | `'all' \| 'contributing'` | 否 | `all` | `contributing` 仅返回有贡献记录的组织（首页使用） |
+| `type` | `'partner' \| 'external' \| 'community'` | 否 | — | 按组织类型过滤 |
+| `keyword` | string | 否 | — | 按 `name` 模糊匹配，大小写不敏感 |
+
+**响应 `data`**：`Organization[]`
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "orgId": "nova-silicon",
+      "name": "NovaSilicon",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000002?v=4",
+      "homepageUrl": "https://github.com/nova-silicon",
+      "type": "partner",
+      "tags": ["伙伴单位", "芯片", "驱动"],
+      "aliases": { "github": "nova-silicon", "confluence": "NovaSilicon 技术团队" },
+      "joinedAt": "2023-06-15T00:00:00Z",
+      "description": "提供 NPU 驱动与算子库适配，主导异构算力接入方案。"
+    }
+  ]
+}
+```
+
+**默认排序**：`type` 权重（`community` → `partner` → `external`），同权重按 `name` 升序。
+
+---
+
+#### 5.3.3 `GET /api/contributions`
+
+**用途**：社区活跃度页的贡献排行榜与明细表数据源（GitHub 维度）。
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `orgIds` | string（逗号分隔） | 否 | — | 组织 ID 白名单，如 `openan-labs,nova-silicon` |
+| `from` | string (ISO 8601) | 否 | — | 统计起始时间 |
+| `to` | string (ISO 8601) | 否 | — | 统计结束时间 |
+| `sortBy` | `'pullRequests' \| 'issues' \| 'linesChanged' \| 'repos'` | 否 | `pullRequests` | 排序字段 |
+| `order` | `'asc' \| 'desc'` | 否 | `desc` | 排序方向 |
+| `limit` | number | 否 | — | 仅返回前 N 条，用于排行榜 Top N；不传返回全部 |
+
+**响应 `data`**：`OrganizationContribution[]`，字段见 3.2。
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "orgId": "openan-labs",
+      "orgName": "OpenAN Labs",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000001?v=4",
+      "homepageUrl": "https://github.com/openan-labs",
+      "github": { "pullRequests": 486, "issues": 212, "linesChanged": 318420, "repos": 24 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    }
+  ]
+}
+```
+
+**校验规则**：`from` 晚于 `to` → `40002`；`orgIds` 含未知 ID 时**忽略该项并继续**（记 `WARN`），不整体报错。
+
+> **阶段三行为变化预告**：`from`/`to` 在阶段一**不生效**（本地数据无时间维度明细），接口接受参数但返回全量，并在 `message` 中保持 `"ok"`。阶段三接入 GitHub 后由适配器真正按区间过滤。前端无需改动。
+
+---
+
+#### 5.3.4 `GET /api/insights`
+
+**用途**：社区活跃度页的 Confluence 维度数据。
+
+**请求参数**：与 `/api/contributions` 相同（`sortBy` 可选值为 `requirements` / `bestPractices` / `deployments`）。
+
+**响应 `data`**：`OrganizationInsight[]`，字段见 3.3。
+
+---
+
+#### 5.3.5 `GET /api/contributions/summary`
+
+**用途**：社区活跃度页环形图的聚合数据，避免前端把两类数据合并后再计算。
+
+**请求参数**：`orgIds`、`from`、`to`（语义同上）。
+
+**响应 `data`**：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `totals` | object | 五类指标总量 |
+| `totals.pullRequests` | number | PR 总数 |
+| `totals.issues` | number | Issue 总数 |
+| `totals.linesChanged` | number | 代码量总数 |
+| `totals.requirements` | number | 需求总数 |
+| `totals.bestPractices` | number | best-practice 案例总数 |
+| `totals.deployments` | number | 局点总数 |
+| `orgCount` | number | 参与统计的组织数 |
+| `updatedAt` | string | 数据更新时间 |
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "totals": {
+      "pullRequests": 817,
+      "issues": 353,
+      "linesChanged": 579300,
+      "requirements": 89,
+      "bestPractices": 39,
+      "deployments": 27
+    },
+    "orgCount": 4,
+    "updatedAt": "2026-09-18T09:00:00Z"
+  }
+}
+```
+
+> **口径**：`linesChanged` 因量级与其他四项差异大，**不纳入环形图占比**（否则会淹没其他分类）。环形图仅呈现 PR、Issue、需求、best-practice、局点五类；`linesChanged` 单独在排行榜中展示。
+
+---
+
+#### 5.3.6 `GET /api/meetings`
+
+**用途**：参会情况页的时间线数据；`includeDetail=true` 时一并返回详情表格数据。
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `year` | number | 否 | — | 按开始年份过滤，范围 2000–2100，越界 → `40003` |
+| `includeDetail` | boolean（字符串 `'true'`/`'false'`） | 否 | `false` | 是否返回 `MeetingDetail` 完整字段 |
+| `upcomingOnly` | boolean | 否 | `false` | 仅返回未结束的会议（首页底部横幅可用） |
+| `page` | number | 否 | `1` | 页码，最小 1 |
+| `pageSize` | number | 否 | `20` | 每页数量，最大 100 |
+
+**响应 `data`**：
+
+- `includeDetail=false` → `{ items: MeetingSummary[], total, page, pageSize }`
+- `includeDetail=true` → `{ items: MeetingDetail[], total, page, pageSize }`
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "items": [
+      {
+        "id": "openan-summit-2026",
+        "name": "OpenAN Summit 2026",
+        "startDate": "2026-11-12T00:00:00Z",
+        "endDate": "2026-11-14T00:00:00Z",
+        "location": "上海 · 世博中心",
+        "websiteUrl": "https://openan.example.org/summit/2026",
+        "isUpcoming": true,
+        "host": "OpenAN 社区委员会",
+        "attendeeCount": 640,
+        "attendingOrganizations": ["OpenAN Labs", "NovaSilicon", "HarborCloud"],
+        "agendaHighlights": ["异构算力统一接入方案年度进展"],
+        "outcomes": ["发布编排引擎 2.0 路线图"],
+        "minutesUrl": "https://openan.example.org/summit/2026/minutes"
+      }
+    ],
+    "total": 3,
+    "page": 1,
+    "pageSize": 20
+  }
+}
+```
+
+**默认排序**：`startDate` **降序**（最近的会议在最上），符合"时间线回顾"的阅读习惯。前端按年份分组渲染。
+
+---
+
+#### 5.3.7 `GET /api/meetings/:id`
+
+**用途**：单场会议详情（本期由前端锚点跳转实现，此接口为后续独立详情页预留）。
+
+**路径参数**：`id`（会议主键）。
+
+**响应 `data`**：`MeetingDetail`。
+
+**失败场景**：`40402`（会议不存在）。
+
+---
+
+## 6. 契约治理
+
+### 6.1 变更流程
+
+1. 先在本文档修改字段定义与接口描述；
+2. 同步更新 `apps/api` 中的 DTO/端口接口与 `apps/web` 中的 `types/`；
+3. 更新 `data/*.json` 种子数据（如需）；
+4. 若为不兼容变更，提升对应文件的 `schemaVersion` 并在本目录追加变更记录。
+
+### 6.2 字段语义速查（供 Code Review）
+
+| 字段 | 不等于 | 正确语义 |
+| --- | --- | --- |
+| `github.pullRequests` | 所有 PR | **已合并**的 PR |
+| `github.linesChanged` | 净增行数 | `additions + deletions` 累加 |
+| `github.issues` | 仅 opened | 提出或参与（含评论/被指派）的 Issue |
+| `confluence.deployments` | 客户数量 | 已落地部署的局点实例数（一需求多局点分别计数） |
+| `type = 'external'` | 非社区成员 | 独立外部开发者（非单位身份） |
+| `isUpcoming` | 未开始 | **未结束**（进行中的会议同样为 `true`） |
+
+### 6.3 契约自检清单
+
+- [ ] 三个页面的每个展示字段，都能在本文档中找到对应定义
+- [ ] `data/*.json` 中不存在本文档未定义的字段
+- [ ] 所有必填字段在种子数据中均已提供
+- [ ] 可选字段在前端均有降级展示策略
+- [ ] API 响应信封结构全部一致，无裸返回
+- [ ] 错误码全部取自第 7 节错误码表，无临时硬编码数字
+
