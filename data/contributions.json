@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-21T10:53:35.880Z",
+  "data": [
+    {
+      "orgId": "cmcc",
+      "orgName": "China Mobile",
+      "logoUrl": "/logos/china_mobile.png",
+      "homepageUrl": "https://www.chinamobileltd.com",
+      "github": {
+        "pullRequests": 40,
+        "commits": 148,
+        "issues": 3,
+        "linesChanged": 24440,
+        "repos": 3
+      },
+      "updatedAt": "2026-09-21T10:53:35.879Z"
+    },
+    {
+      "orgId": "huawei",
+      "orgName": "Huawei",
+      "logoUrl": "/logos/huawei.png",
+      "homepageUrl": "https://www.huawei.com",
+      "github": {
+        "pullRequests": 333,
+        "commits": 1023,
+        "issues": 108,
+        "linesChanged": 851335,
+        "repos": 13
+      },
+      "updatedAt": "2026-09-21T10:53:35.879Z"
+    },
+    {
+      "orgId": "zte",
+      "orgName": "ZTE",
+      "logoUrl": "/logos/zte.webp",
+      "homepageUrl": "https://www.zte.com.cn",
+      "github": {
+        "pullRequests": 1,
+        "commits": 1,
+        "issues": 0,
+        "linesChanged": 2962,
+        "repos": 1
+      },
+      "updatedAt": "2026-09-21T10:53:35.879Z"
+    },
+    {
+      "orgId": "unattributed",
+      "orgName": "独立开发者",
+      "logoUrl": "",
+      "homepageUrl": "",
+      "github": {
+        "pullRequests": 53,
+        "commits": 84,
+        "issues": 16,
+        "linesChanged": 35841,
+        "repos": 11
+      },
+      "updatedAt": "2026-09-21T10:53:35.879Z"
+    }
+  ]
+}

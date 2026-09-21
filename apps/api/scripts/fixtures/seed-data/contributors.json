@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": [
+    {
+      "contributorId": "lin-chen",
+      "githubId": 100200301,
+      "name": "Lin Chen",
+      "orgId": "nova-silicon",
+      "avatarUrl": "https://avatars.githubusercontent.com/u/100200301?v=4",
+      "joinedAt": "2023-08-02T00:00:00Z",
+      "description": "NPU 驱动核心贡献者"
+    },
+    {
+      "contributorId": "aria-dev",
+      "githubId": 100200302,
+      "name": "Aria",
+      "orgId": null,
+      "avatarUrl": "https://avatars.githubusercontent.com/u/100200302?v=4",
+      "joinedAt": "2024-03-11T00:00:00Z",
+      "description": "独立开发者，专注中文文档翻译",
+      "github": {
+        "pullRequests": 3,
+        "commits": 9,
+        "issues": 2,
+        "linesChanged": 300,
+        "repos": 2
+      }
+    },
+    {
+      "contributorId": "kai-zhou",
+      "githubId": 100200303,
+      "name": "Kai Zhou",
+      "orgId": "harbor-cloud",
+      "avatarUrl": "https://avatars.githubusercontent.com/u/100200303?v=4",
+      "joinedAt": "2024-06-20T00:00:00Z",
+      "description": "多集群调度实践布道者",
+      "github": {
+        "pullRequests": 12,
+        "commits": 77,
+        "issues": 8,
+        "linesChanged": 4200,
+        "repos": 5
+      }
+    },
+    {
+      "contributorId": "solo-hacker",
+      "githubId": 100200304,
+      "name": "",
+      "orgId": null,
+      "avatarUrl": "",
+      "joinedAt": "2025-01-15T00:00:00Z",
+      "description": "独立贡献者，name/avatarUrl 缺失时前端降级展示",
+      "github": {
+        "pullRequests": 5,
+        "commits": 11,
+        "issues": 0,
+        "linesChanged": 220,
+        "repos": 3
+      }
+    }
+  ]
+}

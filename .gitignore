@@ -1,40 +1,42 @@
-# Dependencies
+# 依赖
 node_modules/
-vendor/
-.venv/
-venv/
-__pycache__/
-*.py[cod]
 
-# Build outputs
+# 构建产物
 dist/
 build/
-out/
-target/
-*.egg-info/
+*.tsbuildinfo
 
-# Logs
-logs/
+# 测试覆盖率
+coverage/
+
+# 日志
 *.log
 npm-debug.log*
-yarn-error.log*
 
-# Environment variables
+# 环境变量（模板 .env.example 保留入库）
 .env
 .env.*
 !.env.example
 
-# IDE / Editor
+# 编辑器 / IDE
 .idea/
-.vscode/
-*.swp
-*.swo
+.vscode/*
+!.vscode/extensions.json
 
-# OS files
+# 操作系统
 .DS_Store
 Thumbs.db
 
-# Temporary files
-tmp/
-temp/
-*.bak
+# 前端工具缓存
+.vite/
+.eslintcache
+
+# AI 助手本地工作目录（任务计划等）
+.codebuddy/
+
+# 采集器运行时状态（游标/配额），按环境而异，不入库
+data/.sync-state.json
+# 数据快照
+data/.snapshots/
+# 手动验证采集器时的临时数据目录（collector-check.mjs 用系统临时目录，不受影响）
+.tmp-collector*/

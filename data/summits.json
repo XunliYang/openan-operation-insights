@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-20T00:00:00Z",
+  "data": [
+    {
+      "id": "one-summit-2026",
+      "name": "ONE Summit Japan 2026",
+      "startDate": "2026-12-10T00:00:00Z",
+      "endDate": "2026-12-11T00:00:00Z",
+      "location": "Toranomon Hills Forum, Tokyo, Japan",
+      "websiteUrl": "https://events.linuxfoundation.org/open-networking-edge-summit-japan/",
+      "isUpcoming": true,
+      "description": "由 LF Networking（Linux 基金会）主办的开放网络与边缘峰会（Open Networking & Edge Summit），以“新全球时代：Agentic AI、边缘 AI 与开放网络”为主题，与 Open Source Summit Japan 同期同地举办。早鸟注册 10 月 5 日截止。",
+      "hostOrgId": null,
+      "host": "LF Networking / The Linux Foundation",
+      "attendeeCount": 0,
+      "attendingOrganizations": [
+        "TELUS, Canada",
+        "Airtel Xtelify, India",
+        "NTT DOCOMO, Japan",
+        "Sri Lanka Telecom PLC, Sri Lanka",
+        "SoftBank Corp., Japan",
+        "Viettel Group, Vietnam",
+        "Rakuten Mobile, Japan",
+        "KDDI, Japan",
+        "Duetsche Telokom AG, Germany"
+      ],
+      "agendaHighlights": [
+        "大会主题：新全球时代——Agentic AI、边缘 AI 与开放网络",
+        "主题演讲、分组技术会议与解决方案展示（12 月 10 日）",
+        "高管论坛（仅限受邀者）与参会者招待会",
+        "LFN 项目迷你峰会（12 月 11 日）"
+      ],
+      "outcomes": [],
+      "minutesUrl": null
+    }
+  ]
+}

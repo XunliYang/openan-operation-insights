@@ -12,9 +12,9 @@
 | 框架 | `@nestjs/core`、`@nestjs/common`、`@nestjs/platform-express` | 应用骨架（默认 Express 适配器，便于 Vite 代理与轻量部署） |
 | 配置 | `@nestjs/config` | 环境变量加载、校验与类型化访问 |
 | 校验 | `class-validator`、`class-transformer` | DTO 白名单校验与类型转换 |
-| 缓存（预留） | `@nestjs/cache-manager`、`cache-manager` | 阶段三外部采集结果缓存 |
+| 缓存（预留） | `@nestjs/cache-manager`、`cache-manager` | 阶段三外部采集结果缓存（**尚未引入**） |
 | 日志 | NestJS 内置 `Logger` | 结构化日志输出 |
-| 外部 SDK（预留） | `@octokit/rest`、`@octokit/graphql` | 阶段三 GitHub 采集 |
+| 外部调用 | 原生 `fetch`（**未引入 `@octokit` 等 SDK**） | `collector/` 直接调用 GitHub GraphQL，减少依赖面与版本维护成本 |
 | 文件 IO | Node `fs/promises` | JSON 仓储读写 |
 
 ---
@@ -31,7 +31,7 @@ flowchart TB
   APP --> COMMON["CommonModule<br/>响应拦截器 / 异常过滤器 / 错误码"]
   APP --> HOME["HomeModule"]
   APP --> ACT["ActivityModule"]
-  APP --> MTG["MeetingModule"]
+  APP --> MTG["SummitModule"]
   APP --> ORG["OrganizationModule"]
   APP --> PROV["ProvidersModule<br/>端口 Token 绑定与适配器注册"]
   APP --> REPO["RepositoriesModule<br/>JsonRepository 工厂"]
@@ -47,15 +47,17 @@ flowchart TB
 
 | 模块 | 控制器 | 服务 | 依赖的端口 | 说明 |
 | --- | --- | --- | --- | --- |
-| `HomeModule` | `HomeController` | `HomeService` | `HOME_METRIC_PORT`、`ORGANIZATION_PORT`、`MEETING_PORT` | 聚合首页指标、下次会议、贡献组织概览 |
+| `HomeModule` | `HomeController` | `HomeService` | `HOME_METRIC_PORT`、`ORGANIZATION_PORT`、`SUMMIT_PORT` | 聚合首页指标、下次峰会、贡献组织概览 |
 | `OrganizationModule` | `OrganizationController` | `OrganizationService` | `ORGANIZATION_PORT`、`CONTRIBUTION_PORT` | 组织档案与筛选 |
-| `ActivityModule` | `ActivityController` | `ActivityService` | `CONTRIBUTION_PORT`、`INSIGHT_PORT` | 贡献排行、类型分布、明细聚合 |
-| `MeetingModule` | `MeetingController` | `MeetingService` | `MEETING_PORT` | 会议列表、时间线、详情 |
-| `ProvidersModule` | — | — | — | 集中声明所有端口 Token → 适配器类的绑定，**唯一需要改动的切换点** |
+| `ActivityModule` | `ActivityController` | `ActivityService` | `CONTRIBUTION_PORT`、`INSIGHT_PORT` | 贡献明细、成果洞察、贡献聚合 |
+| `SummitModule` | `SummitController` | `SummitService` | `SUMMIT_PORT` | 峰会列表、时间线、详情 |
+| `ProvidersModule` | — | — | — | 集中声明所有端口 Token → 适配器类的绑定；当前五个端口**恒为 JSON 实现**，采集不经此切换（见 2.3 节） |
 | `RepositoriesModule` | — | — | — | 提供 `JsonRepository<T>` 实例（按文件名注入） |
 | `CommonModule` | — | — | — | 全局响应拦截器、异常过滤器、错误码枚举 |
 
-> **设计意图**：把"端口 → 适配器"的绑定集中到 `ProvidersModule`。阶段三切换数据源时，只需修改该模块内的 `useClass`，业务模块（Home / Activity / Meeting）**零改动**。
+> **设计意图**：把"端口 → 适配器"的绑定集中到 `ProvidersModule`，使业务模块（Home / Activity / Summit）只依赖端口、对数据来源无感知。
+>
+> **重要修正（读写分离）**：外部数据采集**不通过本模块切换**。按"采集写、接口读"的设计（见 `05-integration-roadmap.md` 2.5 节），`src/collector` 是唯一写入 `data/*.json` 的入口，API 请求链路永远只读本地落盘文件，因此 `CONTRIBUTION_PORT` / `INSIGHT_PORT` **恒为 JSON 实现**，不存在 `GithubContributionProvider` 之类的第二套适配器。本模块的绑定能力保留给另一类场景：未来更换存储实现（如 PostgreSQL），或确需 API 链路直连上游实时查询时。
 
 ### 2.3 关键文件清单约定
 
@@ -80,16 +82,25 @@ apps/api/src/
 │   │   ├── organization.port.ts
 │   │   ├── contribution.port.ts
 │   │   ├── insight.port.ts
-│   │   └── meeting.port.ts
+│   │   └── summit.port.ts
 │   ├── tokens.ts                    # 所有 DI Token 常量
-│   ├── json/                        # 本阶段实现（读 data/*.json）
-│   ├── github/                      # 阶段三实现（本期仅目录与类占位）
-│   └── confluence/                  # 阶段三实现（本期仅目录与类占位）
+│   ├── json/                        # 当前唯一实现（读 data/*.json）
+│   └── providers.module.ts          # 端口 → 适配器绑定（换存储 / 直连上游时才动）
+├── collector/                       # ★ 采集器：独立 Nest 上下文，不启动 HTTP 服务
+│   ├── main.ts                      # CLI 入口（--mode=auto|incremental|full、--dry-run）
+│   ├── collector.module.ts          # 采集上下文装配，与 AppModule 解耦
+│   ├── collector.tokens.ts          # GITHUB_SOURCE 注入 Token（真实 / 离线可切换）
+│   ├── collector.constants.ts       # 分页、限流阈值、请求间隔等常量
+│   ├── contribution-collector.service.ts   # 记录按 orgId 归并后写入 contributions.json
+│   ├── github-source.types.ts       # GithubSource 抽象与记录类型
+│   ├── graphql-github.source.ts     # 真实实现（原生 fetch 调 GitHub GraphQL）
+│   ├── fixture-github.source.ts     # 离线实现（GITHUB_FIXTURE，无 token 自检用）
+│   └── sync-state.store.ts          # data/.sync-state.json 游标读写
 └── modules/
     ├── home/
     ├── organization/
     ├── activity/
-    └── meeting/
+    └── summit/
 ```
 
 ---
@@ -99,7 +110,7 @@ apps/api/src/
 | 层 | 职责 | 严格禁止 |
 | --- | --- | --- |
 | Controller | 绑定查询参数到 DTO、调用 Service、返回数据对象（由拦截器包装） | 读写文件、调用外部 API、业务口径计算 |
-| Service | 口径计算、多源合并、排序、过滤、分页裁剪 | 出现 `fs`、`axios`、`@octokit` 等具体实现引用；出现 `data/*.json` 文件名 |
+| Service | 口径计算、多源合并、排序、过滤、分页裁剪 | 出现 `fs`、`fetch`、`@octokit` 等具体实现引用；出现 `data/*.json` 文件名 |
 | Provider Port | 声明方法签名与返回类型（纯 TypeScript interface） | 包含任何实现细节或框架装饰器 |
 | Provider Adapter | 实现端口：读取数据、字段映射、缓存读写 | 包含业务口径计算（应放在 Service） |
 
@@ -116,8 +127,8 @@ apps/api/src/
 ```ts
 // providers/ports/organization.port.ts
 export interface ListOrganizationsQuery {
-  /** 仅返回有贡献记录的组织 */
-  scope?: 'all' | 'contributing';
+  /** 按组织类型过滤 */
+  type?: OrganizationType;
   /** 按名称模糊匹配 */
   keyword?: string;
 }
@@ -127,7 +138,7 @@ export interface Organization {
   name: string;           // 展示名
   logoUrl: string;        // 对应 GitHub avatar_url
   homepageUrl: string;    // 对应 GitHub html_url
-  type: 'partner' | 'external' | 'community';
+  type: 'partner' | 'external' | 'community' | 'individual'; // individual = 独立开发者伪组织
   tags: string[];         // 如 ['伙伴单位','芯片']
   aliases?: Record<string, string>; // { github: 'xxx', confluence: 'yyy' }
 }
@@ -137,6 +148,8 @@ export interface OrganizationPort {
   getOrganizationById(orgId: string): Promise<Organization | null>;
 }
 ```
+
+> `scope` 是 HTTP 接口层参数（`GET /api/organizations`），由 `OrganizationService` 组合贡献数据实现（`contributing` = 全量组织 + 贡献分 + 降序，见 ADR-0001），不属于 Port 的查询条件。
 
 ```ts
 // providers/ports/contribution.port.ts
@@ -184,7 +197,6 @@ export interface OrganizationInsight {
   confluence: {
     requirements: number;  // 需求
     bestPractices: number; // best-practice 案例
-    deployments: number;   // 局点
   };
   updatedAt: string;
 }
@@ -209,9 +221,9 @@ export interface MetricValue {
 export interface HomeSummary {
   partnerCount: MetricValue;            // 社区伙伴数量
   externalDeveloperCount: MetricValue;  // 外部开发者数量
-  meetingCount: MetricValue;            // 参加的会议
+  summitCount: MetricValue;            // 参加的峰会
   useCaseCount: MetricValue;            // 已提供的应用案例
-  nextMeeting: MeetingSummary | null;   // 下一次会议
+  nextSummit: SummitSummary | null;   // 下一次峰会
   updatedAt: string;
 }
 
@@ -220,18 +232,18 @@ export interface HomeMetricPort {
 }
 ```
 
-### 4.4 会议端口
+### 4.4 峰会端口
 
 ```ts
-// providers/ports/meeting.port.ts
-export interface MeetingQuery {
+// providers/ports/summit.port.ts
+export interface SummitQuery {
   year?: number;
   includeDetail?: boolean;
-  /** 仅返回未结束的会议 */
+  /** 仅返回未结束的峰会 */
   upcomingOnly?: boolean;
 }
 
-export interface MeetingSummary {
+export interface SummitSummary {
   id: string;
   name: string;
   startDate: string;      // ISO 8601
@@ -241,7 +253,7 @@ export interface MeetingSummary {
   isUpcoming: boolean;
 }
 
-export interface MeetingDetail extends MeetingSummary {
+export interface SummitDetail extends SummitSummary {
   host: string;
   attendeeCount: number;
   attendingOrganizations: string[];
@@ -250,10 +262,10 @@ export interface MeetingDetail extends MeetingSummary {
   minutesUrl?: string;
 }
 
-export interface MeetingPort {
-  listMeetings(q: MeetingQuery): Promise<MeetingSummary[]>;
-  getMeetingById(id: string): Promise<MeetingDetail | null>;
-  getNextMeeting(): Promise<MeetingSummary | null>;
+export interface SummitPort {
+  listSummits(q: SummitQuery): Promise<SummitSummary[]>;
+  getSummitById(id: string): Promise<SummitDetail | null>;
+  getNextSummit(): Promise<SummitSummary | null>;
 }
 ```
 
@@ -265,30 +277,30 @@ export const HOME_METRIC_PORT = Symbol('HOME_METRIC_PORT');
 export const ORGANIZATION_PORT = Symbol('ORGANIZATION_PORT');
 export const CONTRIBUTION_PORT = Symbol('CONTRIBUTION_PORT');
 export const INSIGHT_PORT = Symbol('INSIGHT_PORT');
-export const MEETING_PORT = Symbol('MEETING_PORT');
+export const SUMMIT_PORT = Symbol('SUMMIT_PORT');
 ```
 
 ```ts
-// providers/providers.module.ts（切换数据源时只改此文件）
+// providers/providers.module.ts（更换存储实现 / 确需直连上游时才改此文件）
+@Global()
 @Module({
   providers: [
-    // ── 当前阶段：JSON 种子数据 ──────────────────
+    // ── 五个端口恒为 JSON 实现 ──────────────────
+    // 采集不走端口切换：collector 写 data/*.json，API 只读本地落盘文件
     { provide: HOME_METRIC_PORT,  useClass: JsonHomeMetricProvider },
     { provide: ORGANIZATION_PORT, useClass: JsonOrganizationProvider },
     { provide: CONTRIBUTION_PORT, useClass: JsonContributionProvider },
     { provide: INSIGHT_PORT,      useClass: JsonInsightProvider },
-    { provide: MEETING_PORT,      useClass: JsonMeetingProvider },
-
-    // ── 阶段三：真实数据源（取消注释即完成切换）──
-    // { provide: CONTRIBUTION_PORT, useClass: GithubContributionProvider },
-    // { provide: INSIGHT_PORT,      useClass: ConfluenceInsightProvider },
+    { provide: SUMMIT_PORT,       useClass: JsonSummitProvider },
   ],
-  exports: [HOME_METRIC_PORT, ORGANIZATION_PORT, CONTRIBUTION_PORT, INSIGHT_PORT, MEETING_PORT],
+  exports: [HOME_METRIC_PORT, ORGANIZATION_PORT, CONTRIBUTION_PORT, INSIGHT_PORT, SUMMIT_PORT],
 })
 export class ProvidersModule {}
 ```
 
-> **可替换性验收标准**：若"切换数据源"需要修改 `modules/` 下任何一个文件的代码，则视为架构被破坏。
+> **为什么没有 GitHub / Confluence 适配器**：本架构**不采用**"为真实数据源再写一套 Port 适配器"的方案。真实数据源由 `src/collector` 采集后落盘为与种子数据**完全相同**的 JSON 结构，API 读到的内容与阶段一别无二致——这正是"契约不变、前端与业务层零改动"的实现方式，同时避免了"端口适配器"与"采集器"两条并行数据路径（见 `05-integration-roadmap.md` 1.2 节约束 1 与 4）。
+>
+> **可替换性验收标准**：若"更换数据来源"需要修改 `modules/` 下任何一个文件的代码，则视为架构被破坏。按当前口径，更换数据来源（人工维护 → 采集脚本 → 定时采集）**只改变写入方，API 代码零改动**。
 
 ### 4.6 Provider 实现规范
 
@@ -328,13 +340,13 @@ export interface JsonRepository<T> {
 
 | 文件 | 承载实体 | 写入频率 | 规模预估 |
 | --- | --- | --- | --- |
-| `data/home.json` | `HomeSummary`（首页指标 + `nextMeetingId`） | 极低 | 1 条记录 |
+| `data/home.json` | `HomeSummary`（首页指标 + `nextSummitId`） | 极低 | 1 条记录 |
 | `data/organizations.json` | `Organization[]` | 低 | 数十条 |
 | `data/contributions.json` | `OrganizationContribution[]` | 低（阶段三为定时采集） | 数十条 |
 | `data/insights.json` | `OrganizationInsight[]` | 低 | 数十条 |
-| `data/meetings.json` | `MeetingDetail[]` | 极低 | 十余条 |
+| `data/summits.json` | `SummitDetail[]` | 极低 | 十余条 |
 
-> `nextMeeting` 在 `home.json` 中只存 `nextMeetingId` 引用，实际会议对象由 `MeetingProvider` 提供，避免同一会议数据两处维护导致不一致。
+> `nextSummit` 在 `home.json` 中只存 `nextSummitId` 引用，实际峰会对象由 `SummitProvider` 提供，避免同一峰会数据两处维护导致不一致。
 
 ### 5.3 读取路径（含缓存）
 
@@ -397,7 +409,7 @@ sequenceDiagram
 
 | 规范 | 说明 |
 | --- | --- |
-| 命名 | `<动作><资源>QueryDto`，如 `ListMeetingsQueryDto` |
+| 命名 | `<动作><资源>QueryDto`，如 `ListSummitsQueryDto` |
 | 白名单 | DTO 类上启用 `@IsOptional()` / `@IsString()` 等，并配合全局 `whitelist: true`、`forbidNonWhitelisted: true` 拒绝未知参数 |
 | 类型转换 | 开启 `transform: true` + `enableImplicitConversion: true`，使 `?year=2026` 自动转为 `number` |
 | 枚举约束 | 年份、scope、排序字段使用 `@IsIn([...])` 限定取值范围 |
@@ -406,7 +418,7 @@ sequenceDiagram
 示例：
 
 ```ts
-export class ListMeetingsQueryDto {
+export class ListSummitsQueryDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(2000) @Max(2100)
   year?: number;
 
@@ -484,7 +496,7 @@ export class ListMeetingsQueryDto {
 | `40003` | 400 | `INVALID_YEAR` | 年份超出允许范围 | 重置筛选 |
 | `40400` | 404 | `RESOURCE_NOT_FOUND` | 通用资源不存在 | 展示空态 |
 | `40401` | 404 | `ORGANIZATION_NOT_FOUND` | 组织不存在 | 展示空态 + 返回列表 |
-| `40402` | 404 | `MEETING_NOT_FOUND` | 会议不存在 | 展示空态 + 返回时间线 |
+| `40402` | 404 | `SUMMIT_NOT_FOUND` | 峰会不存在 | 展示空态 + 返回时间线 |
 | `50000` | 500 | `INTERNAL_ERROR` | 未预期错误 | 展示错误态 + 重试 |
 | `50001` | 500 | `DATA_CORRUPTED` | JSON 文件结构/版本校验失败 | 展示"数据维护中" |
 | `50002` | 500 | `DATA_WRITE_FAILED` | 数据写入失败 | 提示重试 |
@@ -503,21 +515,21 @@ export class ListMeetingsQueryDto {
 | 级别 | `error`（影响功能）、`warn`（可降级）、`log`（关键流程）、`debug`（开发期细节，生产关闭） |
 | 请求日志 | 记录 `method`、`path`、`status`、`durationMs`；**不记录**请求体全文与查询串完整值（避免敏感信息） |
 | 数据访问 | 记录文件名与记录条数，如 `loaded contributions.json (23 records)`，**不 dump 内容** |
-| 外部调用（阶段三） | 记录目标资源标识与状态码（如 `GET /repos/openan/x/pulls → 200`），**严禁**记录 Token、Authorization 头、完整响应体 |
+| 外部调用（`collector/`） | 记录目标资源标识与状态码（如 `GET /repos/openan/x/pulls → 200`），**严禁**记录 Token、Authorization 头、完整响应体 |
 | 异常日志 | 未预期异常记录完整堆栈与请求上下文（路径、参数键名），不回传客户端 |
 | 禁止项 | 任何凭据、个人身份信息、完整数据文件内容 |
 
 ---
 
-## 9. 缓存与限流（阶段三预留）
+## 9. 缓存与限流
 
 | 机制 | 设计 | 说明 |
 | --- | --- | --- |
-| 服务端缓存 | `CacheModule`（内存实现），key 形如 `contrib:${orgIds}:${from}:${to}`，TTL 默认 `CACHE_TTL_SECONDS=300` | 本期可启用但收益有限（数据来自本地文件）；阶段三为必备 |
-| 缓存穿透 | 空结果也缓存（短 TTL），避免重复打到外部 API | — |
-| 缓存击穿 | 同一 key 的并发请求合并为一次上游调用（Promise 复用） | 配合 Repository 串行队列 |
-| 上游限流 | 采集任务而非请求链路触发；按 `X-RateLimit-Remaining` 自适应退避 | 详见 `05-integration-roadmap.md` |
-| 降级 | 上游不可用时返回最近一次成功采集的落盘数据，并在响应头标记 `X-Data-Stale: true` | 前端据此提示"数据可能不是最新" |
+| 服务端缓存 | `CacheModule`（内存实现），key 形如 `contrib:${orgIds}:${from}:${to}`，TTL 默认 `CACHE_TTL_SECONDS=300` | 与 `JsonRepository` 内存缓存叠加；数据来自本地文件，收益有限，按需启用（**尚未引入依赖**） |
+| 缓存穿透 | 空结果也缓存（短 TTL），避免重复读取文件 | — |
+| 缓存击穿 | 同一 key 的并发请求合并为一次文件读取（Promise 复用） | 配合 Repository 串行队列 |
+| 上游限流 | **不由请求链路触发**：配额预检、串行间隔与指数退避全部实现在采集任务内 | 详见 `05-integration-roadmap.md` 2.5 节与 `src/collector` |
+| 降级 | API 侧不存在上游调用，读取的始终是最近一次成功落盘的 JSON；数据陈旧状态由采集器写入的 `.sync-state.json` 体现 | 前端据此提示"数据可能不是最新" |
 
 ---
 
@@ -536,7 +548,7 @@ export class ListMeetingsQueryDto {
 | `GITHUB_TOKEN` | 否（阶段三必填） | — | GitHub 个人访问令牌，需 `repo:read` 权限 |
 | `GITHUB_ORGS` | 否 | — | 待采集组织，逗号分隔 |
 | `GITHUB_REPOS` | 否 | — | 可选，显式指定仓库白名单 |
-| `GITHUB_LOOKBACK_DAYS` | 否 | `90` | 增量采集回溯窗口 |
+| `GITHUB_LOOKBACK_DAYS` | 否 | `3650` | **兜底**回溯窗口；仅当本地游标缺失/损坏时生效，正常增量以 `lastSyncAt` 为准 |
 | `CONFLUENCE_BASE_URL` | 否 | — | Confluence 站点地址 |
 | `CONFLUENCE_TOKEN` | 否 | — | Confluence API Token |
 | `CONFLUENCE_SPACES` | 否 | — | 待采集空间 Key，逗号分隔 |
@@ -562,7 +574,7 @@ sequenceDiagram
   W->>C: GET /api/home/summary
   C->>C: ValidationPipe（无参数，直接通过）
   C->>S: getHomeSummary()
-  par 并发获取三块数据
+  par 并发获取两块数据
     S->>P: getHomeSummary()
     P->>A: getHomeSummary()
     A->>R: read()
@@ -570,11 +582,9 @@ sequenceDiagram
     F-->>R: JSON
     R-->>A: HomeSummary
   and
-    S->>P: listOrganizations({ scope: 'contributing' })
-  and
-    S->>P: getNextMeeting()
+    S->>P: getNextSummit()
   end
-  S->>S: 组装（合并 nextMeeting、附加 updatedAt）
+  S->>S: 组装（合并 nextSummit、附加 updatedAt）
   S-->>C: HomeSummaryDto
   C-->>W: { code:0, message:"ok", data:{...} }
   Note over C,W: ResponseInterceptor 完成包装
@@ -602,9 +612,10 @@ sequenceDiagram
 
 在实现完成后，逐项确认以下条款，任一项不满足即视为偏离架构：
 
-- [ ] `modules/` 下没有任何 `fs`、`axios`、`@octokit` 直接引用
+- [ ] `modules/` 下没有任何 `fs`、`fetch`、`@octokit` 直接引用
 - [ ] 所有数据访问都经由 Provider 端口，端口实现由 `ProvidersModule` 统一声明
-- [ ] 切换数据源只需修改 `ProvidersModule` 的绑定（已用注释形式验证）
+- [ ] 采集链路（`src/collector`）与请求链路完全解耦：API 侧不引用任何外部 API 客户端，只读本地 JSON
+- [ ] `modules/` 下不含任何端口绑定逻辑，绑定集中于 `ProvidersModule`
 - [ ] 所有 Controller 返回值经 `ResponseInterceptor` 统一包装，无手写 `{ code, message, data }`
 - [ ] 所有异常经 `AllExceptionsFilter` 统一处理，错误码取自 `ErrorCode` 枚举
 - [ ] `ValidationPipe` 开启 `whitelist` + `forbidNonWhitelisted` + `transform`

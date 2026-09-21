@@ -1,0 +1,161 @@
+import {
+  Contributor,
+  HomeFileData,
+  SummitDetail,
+  MetricValue,
+  Organization,
+  OrganizationContribution,
+  OrganizationInsight,
+} from '../contract/entities';
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+const isNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every(isString);
+const isNullableString = (value: unknown): value is string | null | undefined =>
+  value === undefined || value === null || isString(value);
+
+const ORGANIZATION_TYPES = ['partner', 'external', 'community', 'individual'];
+const DELTA_DIRECTIONS = ['up', 'down', 'flat'];
+
+function isMetricValue(value: unknown): value is MetricValue {
+  if (!isObject(value)) return false;
+  if (!isNumber(value.value)) return false;
+  if (value.unit !== undefined && !isString(value.unit)) return false;
+  if (value.delta !== undefined && !isNumber(value.delta)) return false;
+  if (value.deltaDirection !== undefined && !DELTA_DIRECTIONS.includes(String(value.deltaDirection)))
+    return false;
+  return true;
+}
+
+export function isOrganization(value: unknown): value is Organization {
+  if (!isObject(value)) return false;
+  return (
+    isString(value.orgId) &&
+    isString(value.name) &&
+    isString(value.logoUrl) &&
+    isString(value.homepageUrl) &&
+    ORGANIZATION_TYPES.includes(String(value.type)) &&
+    isStringArray(value.tags) &&
+    (value.aliases === undefined || isObject(value.aliases)) &&
+    (value.emailDomains === undefined || isStringArray(value.emailDomains)) &&
+    isNullableString(value.joinedAt) &&
+    isNullableString(value.description)
+  );
+}
+
+export function isOrganizationArray(value: unknown): value is Organization[] {
+  return Array.isArray(value) && value.every(isOrganization);
+}
+
+export function isContribution(value: unknown): value is OrganizationContribution {
+  if (!isObject(value)) return false;
+  const github = value.github;
+  return (
+    isString(value.orgId) &&
+    isString(value.orgName) &&
+    isString(value.logoUrl) &&
+    isString(value.homepageUrl) &&
+    isObject(github) &&
+    isNumber(github.pullRequests) &&
+    // commits 为后续新增指标：旧数据文件可能缺失，存在时必须为数字（服务层读取统一按 0 归一化）
+    (github.commits === undefined || isNumber(github.commits)) &&
+    isNumber(github.issues) &&
+    isNumber(github.linesChanged) &&
+    isNumber(github.repos) &&
+    isString(value.updatedAt)
+  );
+}
+
+export function isContributionArray(value: unknown): value is OrganizationContribution[] {
+  return Array.isArray(value) && value.every(isContribution);
+}
+
+export function isInsight(value: unknown): value is OrganizationInsight {
+  if (!isObject(value)) return false;
+  const confluence = value.confluence;
+  return (
+    isString(value.orgId) &&
+    isString(value.orgName) &&
+    isString(value.logoUrl) &&
+    isObject(confluence) &&
+    isNumber(confluence.requirements) &&
+    isNumber(confluence.bestPractices) &&
+    isString(value.updatedAt)
+  );
+}
+
+export function isInsightArray(value: unknown): value is OrganizationInsight[] {
+  return Array.isArray(value) && value.every(isInsight);
+}
+
+/** 贡献者内嵌的 GitHub 指标（ADR-0003）：整体可选，存在时字段校验与组织贡献一致（commits 兼容缺失） */
+function isGithubMetrics(value: unknown): value is Contributor['github'] {
+  if (!isObject(value)) return false;
+  return (
+    isNumber(value.pullRequests) &&
+    (value.commits === undefined || isNumber(value.commits)) &&
+    isNumber(value.issues) &&
+    isNumber(value.linesChanged) &&
+    isNumber(value.repos)
+  );
+}
+
+export function isContributor(value: unknown): value is Contributor {
+  if (!isObject(value)) return false;
+  return (
+    isString(value.contributorId) &&
+    isNumber(value.githubId) &&
+    isString(value.name) &&
+    isNullableString(value.orgId) &&
+    isNullableString(value.avatarUrl) &&
+    isNullableString(value.joinedAt) &&
+    isNullableString(value.description) &&
+    (value.github === undefined || isGithubMetrics(value.github))
+  );
+}
+
+export function isContributorArray(value: unknown): value is Contributor[] {
+  return Array.isArray(value) && value.every(isContributor);
+}
+
+export function isSummitDetail(value: unknown): value is SummitDetail {
+  if (!isObject(value)) return false;
+  return (
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.startDate) &&
+    isString(value.endDate) &&
+    isString(value.location) &&
+    isString(value.websiteUrl) &&
+    isBoolean(value.isUpcoming) &&
+    isString(value.description) &&
+    isNullableString(value.hostOrgId) &&
+    isString(value.host) &&
+    isNumber(value.attendeeCount) &&
+    isStringArray(value.attendingOrganizations) &&
+    isStringArray(value.agendaHighlights) &&
+    isStringArray(value.outcomes) &&
+    isNullableString(value.minutesUrl)
+  );
+}
+
+export function isSummitDetailArray(value: unknown): value is SummitDetail[] {
+  return Array.isArray(value) && value.every(isSummitDetail);
+}
+
+export function isHomeFileData(value: unknown): value is HomeFileData {
+  if (!isObject(value)) return false;
+  return (
+    isMetricValue(value.partnerCount) &&
+    isMetricValue(value.externalDeveloperCount) &&
+    isMetricValue(value.summitCount) &&
+    isMetricValue(value.useCaseCount) &&
+    isNullableString(value.nextSummitId)
+  );
+}

@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-21T00:00:00Z",
+  "data": [
+    {
+      "orgId": "cmcc",
+      "name": "China Mobile",
+      "logoUrl": "/logos/china_mobile.png",
+      "homepageUrl": "https://www.chinamobileltd.com",
+      "type": "community",
+      "tags": [],
+      "aliases": { "github": "", "confluence": "" },
+      "emailDomains": ["chinamobile.com", "chinamobileltd.com", "cmcc.com"],
+      "joinedAt": "2023-03-01T00:00:00Z",
+      "description": "OpenAN 社区主席"
+    },
+    {
+      "orgId": "huawei",
+      "name": "Huawei",
+      "logoUrl": "/logos/huawei.png",
+      "homepageUrl": "https://www.huawei.com",
+      "type": "partner",
+      "tags": [],
+      "aliases": { "github": "", "confluence": "" },
+      "emailDomains": ["huawei.com"],
+      "joinedAt": "2023-06-15T00:00:00Z",
+      "description": "OpenAN 社区副主席"
+    },
+    {
+      "orgId": "orange",
+      "name": "Orange",
+      "logoUrl": "/logos/orange.png",
+      "homepageUrl": "https://www.orange.com",
+      "type": "partner",
+      "tags": [],
+      "aliases": { "github": "", "confluence": "" },
+      "emailDomains": ["orange.com", "orange-business.com"],
+      "joinedAt": "2024-01-20T00:00:00Z",
+      "description": ""
+    },
+    {
+      "orgId": "zte",
+      "name": "ZTE",
+      "logoUrl": "/logos/zte.webp",
+      "homepageUrl": "https://www.zte.com.cn",
+      "type": "partner",
+      "tags": [],
+      "aliases": { "github": "", "confluence": "" },
+      "emailDomains": ["zte.com.cn", "zte.com"],
+      "joinedAt": "2024-04-08T00:00:00Z",
+      "description": ""
+    },
+    {
+      "orgId": "ais",
+      "name": "AIS",
+      "logoUrl": "/logos/ais.png",
+      "homepageUrl": "https://www.ais.co.th",
+      "type": "partner",
+      "tags": [],
+      "aliases": { "github": "", "confluence": "" },
+      "emailDomains": ["ais.co.th"],
+      "joinedAt": "2024-09-12T00:00:00Z",
+      "description": ""
+    },
+    {
+      "orgId": "infosys",
+      "name": "Infosys",
+      "logoUrl": "/logos/infosys.webp",
+      "homepageUrl": "https://www.infosys.com",
+      "type": "external",
+      "tags": [],
+      "aliases": { "github": "", "confluence": "" },
+      "emailDomains": ["infosys.com"],
+      "joinedAt": "2024-10-02T00:00:00Z",
+      "description": ""
+    },
+    {
+      "orgId": "asiainfo",
+      "name": "AsiaInfo",
+      "logoUrl": "/logos/asianinfo.png",
+      "homepageUrl": "https://www.asiainfo.com",
+      "type": "external",
+      "tags": [],
+      "aliases": { "github": "" },
+      "emailDomains": ["asiainfo.com"],
+      "description": ""
+    },
+    {
+      "orgId": "personal",
+      "name": "personal",
+      "logoUrl": "/logos/personal.webp",
+      "homepageUrl": "https://www.telecom.com.ar",
+      "type": "external",
+      "tags": [],
+      "aliases": { "github": "" },
+      "emailDomains": ["telecom.com.ar"],
+      "description": ""
+    },
+    {
+      "orgId": "zain",
+      "name": "Zain",
+      "logoUrl": "/logos/zain.png",
+      "homepageUrl": "https://www.kw.zain.com/",
+      "type": "external",
+      "tags": [],
+      "aliases": { "github": "" },
+      "emailDomains": ["zain.com", "kw.zain.com"],
+      "description": ""
+    },
+    {
+      "orgId": "inspur",
+      "name": "Inspur",
+      "logoUrl": "/logos/Inspur.png",
+      "homepageUrl": "https://www.inspur.com",
+      "type": "external",
+      "tags": [],
+      "aliases": { "github": "" },
+      "emailDomains": ["inspur.com"],
+      "description": ""
+    },
+    {
+      "orgId": "unattributed",
+      "name": "独立开发者",
+      "logoUrl": "",
+      "homepageUrl": "",
+      "type": "individual",
+      "tags": ["独立开发者"],
+      "description": "未归属到任何组织的独立贡献者聚合（伪组织）。"
+    }
+  ]
+}

@@ -27,15 +27,16 @@ flowchart LR
 | --- | --- | --- | --- | --- |
 | **阶段一**（本期） | `data/*.json` 人工维护 | 无（静态） | — | — |
 | **阶段二** | 采集脚本写入 JSON | 手动执行 / 本地脚本 | **无**（写入同一文件结构） | **无** |
-| **阶段三** | GitHub / Confluence API 实时查询 + 落盘缓存 | 定时任务（Cron） | **无**（适配器内部映射） | **无** |
+| **阶段三** | GitHub / Confluence API 采集 + 落盘缓存 | 定时任务（Cron） | **无**（采集器内映射后落盘） | **无** |
 
-> **核心承诺**：三个阶段之间，**PDF 契约（04 文档）不变，前端代码不变**。变化的只有 `ProvidersModule` 中端口 → 适配器的绑定。
+> **核心承诺**：三个阶段之间，**契约（04 文档）不变，前端代码不变**。API 侧的五个端口**始终绑定 JSON 实现**——变化的只是「谁往 `data/*.json` 写数据」：阶段一手工维护、阶段二采集脚本、阶段三定时采集任务。业务层与请求链路全程零改动。
 
 ### 1.2 演进的关键约束
 
 1. 采集结果必须落盘到与阶段一**完全相同**的 JSON 结构，否则阶段二无法作为阶段三的降级兜底。
 2. 任何新增的采集元信息（如采集时间、ETag、游标）存放在**独立的 `data/.sync-state.json`** 中，**不污染**业务数据文件。
 3. 采集失败时服务必须可用——降级返回最近一次成功落盘的数据，并标记 `X-Data-Stale: true`。
+4. **采集器与 API 是两个独立的运行上下文**：采集器 `apps/api/src/collector` 不启动 HTTP 服务，API（`AppModule`）也不引用任何外部 API 客户端。因此"接入真实数据源"不体现为端口实现的替换，而是"谁负责写 `data/*.json`"的替换——三阶段的差异全部收敛在写入侧。
 
 ---
 
@@ -51,12 +52,13 @@ flowchart LR
 | `homepageUrl` | 用户/组织 `html_url` | 同上 |
 | `github.repos` | 参与的仓库去重计数 | 由 PR/Issue 记录中的仓库集合推导 |
 | `github.pullRequests` | Search API 或 GraphQL `search` | 仅统计 merged |
+| `github.commits` | PR `commits.totalCount` | **PR 级汇总**；与 merged 口径同源，嵌套查询零额外请求 |
 | `github.issues` | Search API 或 GraphQL | 提出或参与 |
-| `github.linesChanged` | PR `additions + deletions` | 需逐 PR 取详情，是**最重**的一项 |
+| `github.linesChanged` | PR `additions + deletions` | **PR 级汇总**；GraphQL 列表响应即含该字段，无需逐文件统计 |
 
 ### 2.2 REST vs GraphQL 选型
 
-| 维度 | REST (`@octokit/rest`) | GraphQL (`@octokit/graphql`) |
+| 维度 | REST（GitHub REST API） | GraphQL（GitHub GraphQL API） |
 | --- | --- | --- |
 | 获取"某组织某人的 PR 列表" | 需按仓库逐个请求，**N+1 明显** | 一次查询跨多个仓库，可精确指定字段 |
 | 获取 PR 的 `additions/deletions` | 列表接口**不含**该字段，需逐个 PR 详情请求 | 列表即可返回 `additions`/`deletions` |
@@ -69,12 +71,21 @@ flowchart LR
 - GraphQL 用于：按组织/仓库批量拉取 PR 与 Issue 列表**并同时取到 `additions`/`deletions`**，一次请求覆盖多个仓库，彻底消除 N+1。
 - REST 用于：GraphQL 不便表达的场景（如需要 `Search API` 的复杂限定符组合），以及获取用户/组织基本信息。
 
+**通道分工（规避搜索结果上限）**：
+
+| 场景 | 通道 | 理由 |
+| --- | --- | --- |
+| 日常**增量** | `search`（限定 `mergedAt > lastSyncAt`） | 结果量小，一次覆盖全部仓库，成本低 |
+| 每周**全量对账** | **逐仓库遍历** `repository.pullRequests(states: MERGED)` | 搜索类接口存在**单查询最多返回 1000 条结果**的硬上限，且该上限**与账号权限/等级无关**（换高权限账号、GitHub App、企业账号均不提高）；逐仓库翻页无此限制 |
+
+> 增量侧仍用 `search` 的 `total_count` 作为**安全阀**：当 `total_count ≥ 1000` 时记录告警，提示"增量结果可能被截断，应改用逐仓库遍历"。
+
 ```mermaid
 flowchart TB
   Q["采集任务启动"] --> LIST["获取参与仓库列表<br/>（配置 GITHUB_REPOS 或按组织列举）"]
   LIST --> BATCH["按仓库分批（每批 ≤ 10 个仓库）"]
-  BATCH --> GQL["GraphQL 查询：<br/>PR(merged, additions, deletions, author) + Issue(author)"]
-  GQL --> MAP["按 author 归属 → orgId<br/>（经 aliases 映射）"]
+  BATCH --> GQL["GraphQL 查询：<br/>PR(merged, additions, deletions, commits, author) + Issue(author)"]
+  GQL --> MAP["按 author 归属 → orgId<br/>（登录名 aliases.github → 邮箱域名 emailDomains）"]
   MAP --> AGG["聚合：sum / count / 去重仓库数"]
   AGG --> PERSIST["写入 data/contributions.json<br/>（原子写）"]
   PERSIST --> STATE["更新 data/.sync-state.json<br/>（游标、ETag、时间戳）"]
@@ -82,15 +93,18 @@ flowchart TB
 
 ### 2.3 代码量统计口径
 
-`linesChanged` 是全量采集中最昂贵的字段，需明确口径与优化：
+`linesChanged` 的口径必须在契约中锁定，避免不同实现口径漂移成为争议点：
 
 | 决策点 | 结论 | 理由 |
 | --- | --- | --- |
+| 取数口径 | **PR 级汇总**：直接累加 PR 的 `additions + deletions` | 与 GitHub PR 页面 `+N −M` 逐 PR 可对账；GraphQL 列表响应即含该字段 |
 | 是否包含删除行 | **包含**（`additions + deletions`） | 反映真实改动规模 |
-| 是否排除二进制/生成代码 | **排除** | 由文件扩展名与路径白名单过滤（如 `*.pb.go`、`vendor/**`、`dist/**`） |
+| 是否排除二进制/生成代码 | **不排除** | PR 级字段无法区分文件类型；文件级过滤须逐 PR 拉取 files 详情，配额与耗时不可接受 |
 | 是否排除文档 | **不排除** | 文档贡献同样属于社区贡献 |
-| 是否按 merge commit 去重 | **是** | 一个 PR 只在其 `mergedAt` 时点计入一次 |
+| 是否按 merge commit 去重 | **是** | 以 PR 为唯一计数单位，一个 PR 只在其 `mergedAt` 时点计入一次 |
 | 增量策略 | 按 `mergedAt > lastSyncAt` 拉取 | 避免每次全量重算 |
+
+**提交数（`github.commits`）口径**：与 `linesChanged` 同源——逐条累加**已合并 PR** 的 `commits.totalCount`（PR 内提交总数），**不含未经 PR 直接推送到分支的提交**。理由：① 与 `pullRequests` / `linesChanged` 口径一致（同属同一批已合并 PR，可互相印证）；② `totalCount` 与 `additions` / `deletions` 在同一层嵌套查询一并返回，**不产生任何额外请求**；③ 若统计仓库全部提交，须逐仓库翻页遍历提交历史（`defaultBranchRef.target.history`），配额与耗时不可接受，且直推提交的作者多数无 login 关联、归属信号弱。
 
 > **性能提示**：GraphQL 节点成本与返回字段数正相关。全量首采可能消耗较多配额，应安排在夜间执行并限制并发；后续增量采集仅为少量新 PR，成本极低。
 
@@ -98,7 +112,7 @@ flowchart TB
 
 | 机制 | 用途 | 实现要点 |
 | --- | --- | --- |
-| 时间游标 `lastSyncAt` | 只拉取新增/变更数据 | 存于 `.sync-state.json`，每次成功后推进 |
+| 时间游标 `lastSyncAt`（**单游标制**） | 只拉取新增/变更数据 | 存于 `.sync-state.json`，每次成功后推进。**全量优先**：首次采集不设时间下限、拉取全部历史；此后增量严格取 `mergedAt > lastSyncAt`。`GITHUB_LOOKBACK_DAYS` 仅在游标**缺失/损坏**时作为兜底回溯窗口 |
 | `ETag` 条件请求 | REST 场景下避免返回未变更内容 | 存 `If-None-Match` → `304` 时跳过处理，**304 请求不消耗配额** |
 | 全量对账 | 修正历史数据漂移 | 每周一次全量重算（或手动触发），用于纠正漏采 |
 | 幂等写入 | 重复采集不产生重复记录 | 以 `(orgId)` 为唯一键整体替换该组织的贡献对象，而非追加 |
@@ -112,6 +126,7 @@ GitHub 对认证请求的配额约为 **5000 请求/小时**（REST）与**5000 
 | 请求前 | 检查 `X-RateLimit-Remaining` / GraphQL `rateLimit.remaining`，低于安全阈值（如 500）则**中止本轮采集**并保留上次数据 |
 | 请求中 | 串行 + 固定间隔（如 120ms），避免瞬时并发触发二级限流 |
 | 响应处理 | 遇 `403`/`429` 且 `X-RateLimit-Reset` 存在时，记录重置时间并延后重试（指数退避 + 抖动） |
+| 结果上限 | 搜索类接口**单查询最多返回 1000 条**结果（**与账号权限无关**，不因刷新或升级账号而提高）。全量对账一律走**逐仓库遍历**；增量采集用 `total_count ≥ 1000` 检测并告警 |
 | 请求后 | 全部结果落盘缓存，**业务请求链路绝不直接调用 GitHub**（只读本地落盘数据） |
 | 兜底 | 采集失败不清空数据；响应附加 `X-Data-Stale: true` |
 
@@ -123,31 +138,35 @@ GitHub 对认证请求的配额约为 **5000 请求/小时**（REST）与**5000 
 GITHUB_TOKEN=ghp_xxxxxxxx
 GITHUB_ORGS=openan-labs,nova-silicon
 GITHUB_REPOS=
-GITHUB_LOOKBACK_DAYS=90
+GITHUB_LOOKBACK_DAYS=3650
 ```
 
 | 配置项 | 语义 |
 | --- | --- |
-| `GITHUB_ORGS` | 组织白名单。用于自动枚举这些组织下参与过 PR/Issue 的**外部作者**，再按 `aliases.github` 归属到 `orgId` |
+| `GITHUB_ORGS` | 组织白名单。用于自动枚举这些组织下参与过 PR/Issue 的**外部作者**，再按 `aliases.github`（登录名）或 `emailDomains`（邮箱域名）归属到 `orgId` |
 | `GITHUB_REPOS` | 仓库白名单。为空时自动枚举 `GITHUB_ORGS` 下的全部仓库；配置后仅采集列表内仓库，**用于收窄统计口径** |
-| `GITHUB_LOOKBACK_DAYS` | 增量采集的回溯窗口。首次全量采集可临时调大 |
+| `GITHUB_LOOKBACK_DAYS` | **兜底回溯窗口**：仅在 `.sync-state.json` 游标缺失/损坏时生效；正常增量以 `lastSyncAt` 为准。默认值应 ≥ 全量历史跨度（如 3650 天） |
 
-**组织归属映射**（`data/organizations.json` 中的 `aliases`）：
+**组织归属映射**（`data/organizations.json` 中的 `aliases.github` 与 `emailDomains`）：
 
 ```json
 {
   "orgId": "nova-silicon",
   "name": "NovaSilicon",
-  "aliases": { "github": "nova-silicon", "confluence": "NovaSilicon 技术团队" }
+  "aliases": { "github": "nova-silicon", "confluence": "NovaSilicon 技术团队" },
+  "emailDomains": ["novasilicon.com"]
 }
 ```
 
-映射流程：
+映射流程（按优先级从高到低）：
 
-1. 从 API 响应取作者 `login`（如 `nova-silicon-bot`）；
+1. 从 API 响应取作者 `login`（如 `nova-silicon-bot`），并采集邮箱信号：**PR 首个提交的作者邮箱**（`commits.nodes[0].commit.author.email`）优先，缺失时退化为账户**公开资料邮箱**（`User.email`）；
 2. 在 `organizations.json` 中查找 `aliases.github` 精确匹配项；
-3. 未匹配到 → 归类为**未认领贡献**（`orgId = "unattributed"`），单独统计并在运营后台提示人工补充映射；
-4. 匹配到 → 累加到对应 `orgId`。
+3. 未匹配到 → 用邮箱域名匹配 `emailDomains`（精确优先，其次按 `.域名` 后缀匹配子域，如 `mail.novasilicon.com` 命中 `novasilicon.com`）；
+4. 仍未匹配到 → 归类为**独立开发者**（`orgId = "unattributed"` 伪组织），在首页以**独立卡片**展示（人数 + 贡献量），并把未匹配的 `login` 记入 `.sync-state.json` 的 `unattributedLogins[]`，供运营人工补充映射；
+5. 匹配到 → 累加到对应 `orgId`。
+
+> **邮箱信号的两个来源**：`@users.noreply.github.com` 等非组织域名不命中任何 `emailDomains`，自然落入独立开发者；邮箱**仅用于内存判定，不写入任何数据文件**；同一贡献者的全部记录（含其 Issue）共用同一邮箱信号（两遍聚合：先按 `login` 汇总邮箱，再统一归属）；人工在 `contributors.json` 中已指定的 `orgId` 不会被自动判定覆盖；多个组织配置相同域名时按档案顺序先到先得并输出 `WARN`。
 
 > **这是全流程中最容易出错的一环**。建议在阶段二先导出作者 login 清单，人工确认映射后再进入阶段三。
 
@@ -161,7 +180,6 @@ GITHUB_LOOKBACK_DAYS=90
 | --- | --- | --- |
 | `confluence.requirements` | 指定空间下带 `需求` 标签的页面数 | 按页面标签或页面属性过滤 |
 | `confluence.bestPractices` | 带 `best-practice` 标签的页面数 | 标签命名需在配置中约定 |
-| `confluence.deployments` | 带 `局点` 标签的页面数，或结构化表格行数 | 若以表格承载局点清单，则统计行数更准确 |
 | `orgId` | 页面创建者 / 自定义字段"归属组织" | 优先取显式字段，避免依赖创建者推断 |
 
 ### 3.2 检索方案
@@ -183,10 +201,9 @@ flowchart LR
 
 | 要点 | 设计 |
 | --- | --- |
-| 标签约定 | 预先在 Confluence 中约定 `需求` / `best-practice` / `局点` 三个标签，采集器只认标签 |
+| 标签约定 | 预先在 Confluence 中约定 `需求` / `best-practice` 两个标签，采集器只认标签 |
 | 空间约定 | 通过 `CONFLUENCE_SPACES` 限定空间，避免误采集其他团队文档 |
 | 归属解析 | 优先读页面的自定义字段（如"所属组织"）；缺失时退化为按页面创建者映射，并在日志中记 `WARN` |
-| 局点统计 | 若"局点"以表格形式记录在同一页面，则统计**表格数据行数**而非页面数（配置项 `CONFLUENCE_DEPLOYMENT_MODE=page\|table`） |
 | 增量 | 使用 `lastmodified >= lastSyncAt`，与 GitHub 采样游标策略一致 |
 | 认证 | 使用 API Token（Basic Auth）或 PAT（Bearer），存于 `CONFLUENCE_TOKEN` |
 
@@ -275,7 +292,8 @@ flowchart LR
     "lastFullSyncAt": "2026-09-14T02:00:00Z",
     "etags": { "repos/openan-labs/core": "\"a1b2c3\"" },
     "rateLimitRemaining": 4380,
-    "status": "success"
+    "status": "success",
+    "unattributedLogins": ["some-user", "another-dev"]
   },
   "confluence": {
     "lastSyncAt": "2026-09-18T00:00:00Z",
@@ -285,6 +303,19 @@ flowchart LR
 ```
 
 > 该文件**不属于业务契约**，前端不可见，可随时删除（删除后触发全量采集）。
+
+### 5.4 离线自检（无需 token）
+
+采集器提供不依赖 `GITHUB_TOKEN` 的端到端自检：以固定记录（`apps/api/scripts/fixtures/github-records.sample.json`）作为采集源，配合**配套合成种子**（`apps/api/scripts/fixtures/seed-data/`）在系统临时目录跑**真实落盘**，校验全量替换 / 增量叠加 / 幂等 / 伪组织补齐 / 邮箱域名归属等不变量，结束后清理临时目录。
+
+```bash
+npm run build -w @openan/api
+npm run collect:check -w @openan/api   # 期望输出：33/33 通过
+```
+
+- 合成种子刻意与仓库 `data/` 解耦：真实 `data/` 会随每次线上采集而变化，若直接作为校验输入，断言将随数据漂移而失效；脚本结尾会逐字节比对，确认真实 `data/` 与种子均未被改动。
+- 固定记录中的 `commitEmail`（PR 首提交作者邮箱）与 `author.email`（账户公开资料邮箱）**仅用于内存归属判定**，脚本会断言其未出现在任何落盘文件中。
+- 覆盖的归属场景：登录名别名精确命中、提交邮箱子域命中（`mail.novasilicon.com` → `novasilicon.com`）、公开资料邮箱兜底、提交邮箱优先于资料邮箱、`@users.noreply.github.com` 不误判。
 
 ---
 
@@ -311,7 +342,7 @@ flowchart LR
 | 文档 | `docs/` 下五篇文档齐备且相互引用一致 |
 | 数据 | 五个 JSON 文件结构符合 04 文档，`schemaVersion = 1` |
 | 契约 | 所有接口路径、字段、错误码与 04 文档逐项对齐 |
-| 可替换性 | `ProvidersModule` 中已用注释标注阶段三切换方式，且业务模块无任何数据源引用 |
+| 可替换性 | 业务模块无任何数据源引用；API 只读本地 JSON，采集链路（`collector/`）与请求链路完全解耦 |
 
 ### M2 · 实现落地（下一迭代）
 
@@ -319,7 +350,7 @@ flowchart LR
 | --- | --- |
 | 前端 | 三个页面按 02 文档渲染完成，全部数据来自接口，无前端硬编码业务数据 |
 | 后端 | 七个接口全部可用，响应信封统一，错误码符合 03 文档 |
-| 数据 | 首页四项指标、组织贡献、会议时间线与详情均可正常展示 |
+| 数据 | 首页四项指标、组织贡献、峰会时间线与详情均可正常展示 |
 | 质量 | 单元测试覆盖 Service 口径计算与 `JsonRepository` 并发写场景 |
 | 性能 | 页面接口本地响应 P95 < 100ms（不含网络） |
 
@@ -348,14 +379,15 @@ flowchart LR
 
 | # | 风险 | 影响 | 概率 | 应对措施 | 责任方 |
 | --- | --- | --- | --- | --- | --- |
-| R1 | 组织在 GitHub / Confluence 命名不一致，贡献无法归并 | 数据失真 | 高 | `aliases` 映射表 + 未认领贡献单独统计 + 阶段二人工作业 | 后端 + 运营 |
+| R1 | 组织在 GitHub / Confluence 命名不一致，贡献无法归并 | 数据失真 | 高 | `aliases` 映射表 + 未匹配贡献归入独立开发者伪组织 + 阶段二人工作业 | 后端 + 运营 |
 | R2 | Confluence 标签与"所属组织"字段未规范落地 | 采集结果为空 | 高 | 进入阶段三前先完成标签规范；采集器对空结果告警 | 运营 |
 | R3 | GitHub 限流导致采集中断 | 数据不更新 | 中 | 增量采集 + 配额预检 + 读写分离（API 只读落盘数据） | 后端 |
 | R4 | 上游口径变更导致数据跳变 | 看板误导决策 | 中 | 波动校验 + 快照回滚 + UI 标注数据更新时间 | 后端 |
-| R5 | `linesChanged` 全量采集成本高 | 首采耗时长/耗配额 | 中 | 分仓库分批 + 夜间执行 + 排除生成代码与二进制 | 后端 |
+| R5 | `linesChanged` 全量采集成本高 | 首采耗时长/耗配额 | 中 | 分仓库分批 + 夜间执行 + PR 级汇总（不做文件级过滤） | 后端 |
 | R6 | JSON 文件被并发写损坏 | 服务不可用 | 低 | 原子写 + 串行队列 + 启动校验 + 降级只读 | 后端 |
 | R7 | 数据文件未持久化，容器重启丢失更新 | 数据回退 | 中 | 部署强制挂载持久化卷 + 定期备份 | 运维 |
 | R8 | 组织贡献含敏感商业信息 | 合规风险 | 低 | 仅采集公开仓库与公开页面；私有数据不入库 | 运营 + 安全 |
+| R9 | 搜索结果超 1000 条被静默截断（与账号权限无关） | 数据少算 | 中 | 全量对账改逐仓库遍历；增量侧 `total_count ≥ 1000` 告警 | 后端 |
 
 ---
 
@@ -365,9 +397,12 @@ flowchart LR
 | --- | --- | --- |
 | 前端是否硬编码数据 | 否，全部走后端接口 | 避免阶段三前端全面返工 |
 | 存储选型 | JSON 文件 + Repository 抽象 | 规模小、零依赖、可平滑替换 |
-| 后端框架 | NestJS | DI 容器让数据源切换成本降到最低 |
+| 后端框架 | NestJS | DI 容器让实现可替换；读写分离让采集与请求解耦 |
 | GitHub 主用 API | GraphQL 为主、REST 为辅 | 消除 N+1，一次拿到 `additions/deletions` |
 | 采集与读取关系 | 读写分离（采集写、接口读） | 上游不可用时看板仍可用 |
-| 增量策略 | 时间游标 + ETag + 每周全量对账 | 兼顾成本、时效与准确性 |
+| 增量策略 | 全量优先 + 单游标（`lastSyncAt`）+ 每周全量对账；`LOOKBACK_DAYS` 仅兜底 | 兼顾成本、时效与准确性 |
+| 采集通道 | 增量 `search` + 全量逐仓库遍历 | 规避单查询 1000 条结果硬上限（与账号权限无关） |
+| `linesChanged` 口径 | PR 级 `additions + deletions`，不过滤文件类型 | 可与 GitHub PR 页逐条对账，成本可接受 |
+| 未匹配贡献 | 伪组织 `unattributed`，前端以「独立开发者」卡片展示人数与贡献 | 个体开发者规模本身是重要运营指标 |
 | 数据异常处理 | 结构校验中止写入，波动校验告警放行 | 既防污染，又不因阈值误判阻断更新 |
 | 契约变更入口 | 先改 04 文档，再改代码 | 保证文档是唯一事实来源 |

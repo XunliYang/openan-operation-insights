@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": [
+    {
+      "orgId": "openan-labs",
+      "orgName": "OpenAN Labs",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000001?v=4",
+      "homepageUrl": "https://github.com/openan-labs",
+      "github": { "pullRequests": 486, "commits": 1420, "issues": 212, "linesChanged": 318420, "repos": 24 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "nova-silicon",
+      "orgName": "NovaSilicon",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000002?v=4",
+      "homepageUrl": "https://github.com/nova-silicon",
+      "github": { "pullRequests": 173, "commits": 512, "issues": 68, "linesChanged": 142880, "repos": 9 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "harbor-cloud",
+      "orgName": "HarborCloud",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000003?v=4",
+      "homepageUrl": "https://github.com/harbor-cloud",
+      "github": { "pullRequests": 121, "commits": 348, "issues": 54, "linesChanged": 96540, "repos": 7 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "lumen-dev",
+      "orgName": "Lumen Dev",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000004?v=4",
+      "homepageUrl": "https://github.com/lumen-dev",
+      "github": { "pullRequests": 37, "commits": 96, "issues": 19, "linesChanged": 21460, "repos": 3 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "stellar-foundry",
+      "orgName": "Stellar Foundry",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000005?v=4",
+      "homepageUrl": "https://github.com/stellar-foundry",
+      "github": { "pullRequests": 74, "commits": 210, "issues": 41, "linesChanged": 58240, "repos": 5 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "orbit-data",
+      "orgName": "Orbit Data",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000006?v=4",
+      "homepageUrl": "https://github.com/orbit-data",
+      "github": { "pullRequests": 60, "commits": 165, "issues": 32, "linesChanged": 49620, "repos": 4 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "delta-node",
+      "orgName": "Delta Node",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000007?v=4",
+      "homepageUrl": "https://github.com/delta-node",
+      "github": { "pullRequests": 40, "commits": 88, "issues": 18, "linesChanged": 29200, "repos": 3 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    },
+    {
+      "orgId": "unattributed",
+      "orgName": "独立开发者",
+      "logoUrl": "",
+      "homepageUrl": "",
+      "github": { "pullRequests": 15, "commits": 28, "issues": 9, "linesChanged": 6800, "repos": 3 },
+      "updatedAt": "2026-09-18T09:00:00Z"
+    }
+  ]
+}

@@ -18,7 +18,7 @@
 | 样式 | `tailwindcss` / `tailwind-merge` / `tailwindcss-animate` | 3.4.17 / ^2.5.5 / ^1.0.7 | 原子化样式、类名合并、动画 |
 | 构建链 | `postcss` / `autoprefixer` | 8.5 / ^10.4.20 | Tailwind 处理链 |
 | 图标 | `lucide-react` / `react-icons` | — | 导航、卡片、状态图标 |
-| 图表 | `recharts` | — | 贡献排行条形图、类型占比环形图 |
+| 图表 | `recharts` | — | 贡献排行条形图、组织贡献占比环形图 |
 | 工具 | `clsx` | — | 条件类名 |
 
 **目录约定**：`src/{layouts, pages, sections, components/ui, features, lib, types, hooks}`，单文件不超过 300 行，超出则拆分为子 section 或抽 hook。
@@ -31,14 +31,14 @@
 
 | 路径 | 页面组件 | 导航名称 | 说明 |
 | --- | --- | --- | --- |
-| `/` | `HomePage` | 首页 | 指标卡 + 贡献组织 + 下一次会议横幅 |
-| `/activity` | `ActivityPage` | 社区活跃度情况 | 贡献排行 + 类型分布 + 明细表 |
-| `/meetings` | `MeetingsPage` | 参会情况 | 时间线 + 会议详情表格 |
+| `/` | `HomePage` | 首页 | 指标卡 + 贡献组织 + 下一次峰会横幅 |
+| `/activity` | `ActivityPage` | 社区活跃度情况 | 贡献排行 + 组织贡献分布 + 明细表 |
+| `/summits` | `SummitsPage` | 参会情况 | 时间线 + 峰会详情表格 |
 | `*` | `NotFoundPage` | — | 兜底 404，提供返回首页入口 |
 
 **路由级懒加载**：三个页面均为独立 chunk，通过 `React.lazy` + `Suspense` 加载，首屏只加载首页代码。
 
-**可选扩展（预留，本期不实现）**：`/activity?org=<orgId>` 下钻单个组织、`/meetings/:meetingId` 会议详情独立页。
+**可选扩展（预留，本期不实现）**：`/activity?org=<orgId>` 下钻单个组织、`/summits/:summitId` 峰会详情独立页。
 
 ### 2.2 路由与应用外壳
 
@@ -49,7 +49,7 @@ Routes 结构示意（实现时以此为准）：
     <Route element={<AppLayout />}>         {/* Navbar + Outlet + Footer */}
       <Route index element={<HomePage />} />
       <Route path="activity" element={<ActivityPage />} />
-      <Route path="meetings" element={<MeetingsPage />} />
+      <Route path="summits" element={<SummitsPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Route>
   </Routes>
@@ -71,8 +71,8 @@ Routes 结构示意（实现时以此为准）：
 | # | 区块 | 组件 | 数据来源 | 字段 |
 | --- | --- | --- | --- | --- |
 | 1 | 核心指标卡区 | `HomeMetricSection` | `GET /api/home/summary` | 见下表 5 张卡片 |
-| 2 | 贡献的组织区块 | `HomeOrganizationsSection` | `GET /api/organizations?scope=contributing` | `orgId, name, logoUrl, homepageUrl, tags[], contributionLevel` |
-| 3 | 下一次会议横幅 | `NextMeetingBanner` | `GET /api/home/summary` → `nextMeeting` | `name, startDate, endDate, location, websiteUrl, isUpcoming` |
+| 2 | 贡献的组织区块 | `HomeOrganizationsSection` | `GET /api/organizations?scope=contributing` | `orgId, name, logoUrl, homepageUrl, tags[], contributionScore, contributionLevel` |
+| 3 | 下一次峰会横幅 | `NextSummitBanner` | `GET /api/home/summary` → `nextSummit` | `name, startDate, endDate, location, websiteUrl, isUpcoming` |
 | 4 | 页脚 | `AppFooter` | `GET /api/home/summary` → `updatedAt` | `updatedAt` |
 
 #### 指标卡字段明细
@@ -81,23 +81,25 @@ Routes 结构示意（实现时以此为准）：
 | --- | --- | --- | --- | --- |
 | 社区伙伴数量 | `partnerCount` | `value`、`unit`、`label` | 蓝→青渐变 | 环比角标 `delta`、`deltaDirection` |
 | 外部开发者数量 | `externalDeveloperCount` | 同上 | 蓝→青渐变 | 同上 |
-| 参加的会议 | `meetingCount` | 同上 | 蓝→青渐变 | 同上 |
+| 参加的峰会 | `summitCount` | 同上 | 蓝→青渐变 | 同上 |
 | 已提供的应用案例 | `useCaseCount` | 同上 | 蓝→青渐变 | 同上 |
-| 下一次会议 | `nextMeeting` | 会议名 + 倒计时文案 | 青→蓝渐变 | `startDate` 格式化、`daysUntil` |
+| 下一次峰会 | `nextSummit` | 峰会名 + 倒计时文案 | 青→蓝渐变 | `startDate` 格式化、`daysUntil` |
 
 ### 3.2 视觉与交互
 
 - 5 张指标卡在 ≥1280px 时横向等宽排列（`grid-cols-5`），数字使用 40px/600 字重渐变文字，页面加载时执行一次**滚动计数**动画（`requestAnimationFrame` 缓动 800ms，仅首次挂载触发）。
 - 卡片基础形态：`rounded-2xl`（16px）+ `border border-white/60` + 多层柔和阴影 + `bg-white/70 backdrop-blur`，`hover` 时 `-translate-y-0.5` 并加深阴影，`transition-all duration-200`。
-- 贡献组织采用**卡片墙**，Logo 使用 `object-contain` 且限定 48×48 容器，缺失时降级为首字母色块。
-- 下一次会议横幅使用通栏渐变背景（`from-blue-700 via-blue-600 to-cyan-500`），左侧文案右侧 CTA 按钮"查看官网"，整个横幅为可点击区域并在新标签打开官网。
+- 贡献组织采用**卡片墙**，Logo 以卡片顶部的**通栏横版横幅（3:1，`object-contain`）**呈现，名称 / 类型徽章 / 贡献等级在横幅下方独立成行；明细表中 Logo 为 3:1 横版（`h-9`）；缺失时降级为首字母色块。
+- 卡片墙展示**全部组织**（不过滤零贡献组织），按综合贡献分降序，同分保持默认顺序；**零分组织**显示「暂无贡献」灰色徽章、贡献分进度条置空，自然居于末尾（ADR-0001）。
+- 卡片墙中 `type = 'individual'` 的伪组织渲染为**独立开发者卡片**：中性色 + 个人图标，标题「独立开发者」，展示**人数**（取 `home/summary` 的 `externalDeveloperCount`）与贡献分，与组织卡片视觉区分。
+- 下一次峰会横幅使用通栏渐变背景（`from-blue-700 via-blue-600 to-cyan-500`），左侧文案右侧 CTA 按钮"查看官网"，整个横幅为可点击区域并在新标签打开官网。
 
 ### 3.3 状态处理
 
 | 状态 | 表现 |
 | --- | --- |
 | 加载中 | 指标卡渲染 5 个骨架块；组织墙渲染 8 个骨架卡；横幅渲染灰底占位条 |
-| 空数据 | 组织墙显示空态插画 + 文案"暂未采集到组织贡献数据"+ 重试按钮 |
+| 空数据 | `organizations.json` 为空时组织墙显示空态插画 + 重试按钮；贡献数据缺失不再导致空态（全量展示，见 ADR-0001） |
 | 错误 | 区块级错误提示，展示统一文案与"重试"按钮，**不阻塞**其他区块渲染 |
 
 ---
@@ -110,13 +112,17 @@ Routes 结构示意（实现时以此为准）：
 | --- | --- | --- | --- |
 | 1 | 筛选概览栏 | `ActivityFilterBar` | 时间范围下拉（近 30 天 / 近 90 天 / 近 1 年 / 全部）、组织多选、重置、导出按钮 |
 | 2 | 贡献排行榜 | `ContributionRankChart` | 横向条形图，可切换指标维度 |
-| 3 | 贡献类型分布 | `ContributionTypePie` | 环形图，中心显示总量 |
-| 4 | 贡献明细表格 | `ContributionDetailTable` | 组织 × 指标矩阵，表头排序 |
+| 3 | 组织贡献分布 | `ContributionCompositionCard` | 环形图，按提交数统计各组织占比，低占比并入「其他」，中心显示提交总量（ADR-0003） |
+| 4 | 贡献明细表格 | `ContributionDetailTable` | 组织 × 指标矩阵，**全量组织**各占一行，表头排序 |
 | 5 | 页脚 | `AppFooter` | 数据更新时间 |
 
 ### 4.2 字段清单
 
-**排行榜 / 明细表共用同一份数据**（`GET /api/contributions`）：
+**排行榜 / 明细表共用同一份行数据**（前端按 `orgId` 合并三源：`GET /api/organizations` 组织档案 + `GET /api/contributions` + `GET /api/insights`）：
+
+- **明细表**：以组织档案为**底表**，全量组织各占一行；无贡献记录的指标按 0 展示、更新时间与仓库数显示"—"，名称 / Logo / 官网以档案为准（ADR-0002）。档案接口失败时退回两源合并结果。
+- **排行榜**：在行数据上按当前指标过滤 `> 0` 后取 Top N，零值组织不进入图表。
+
 
 | 列 | 字段 | 类型 | 可排序 | 备注 |
 | --- | --- | --- | --- | --- |
@@ -126,12 +132,11 @@ Routes 结构示意（实现时以此为准）：
 | 代码量 | `github.linesChanged` | number | ✅ | additions + deletions，千分位展示 |
 | 需求 | `confluence.requirements` | number | ✅ | Confluence 来源 |
 | best-practice 案例 | `confluence.bestPractices` | number | ✅ | Confluence 来源 |
-| 局点 | `confluence.deployments` | number | ✅ | Confluence 来源 |
 | 更新时间 | `updatedAt` | ISO 8601 | ✅ | 相对时间展示 |
 
-**排行榜维度切换**：`pr` / `issue` / `lines` / `requirement` / `bestPractice` / `deployment`，切换时条形图 300ms 过渡动画，取 Top N（默认 10，可切全部）。
+**排行榜维度切换**：`pr` / `issue` / `lines` / `requirement` / `bestPractice`，切换时条形图 300ms 过渡动画，取 Top N（默认 10，可切全部）。
 
-**环形图分类**：PR、Issue、需求、best-practice 案例、局点五类，中心显示五项之和。
+**环形图口径**（ADR-0003）：按组织维度统计 `github.commits` 提交数占比，数据复用 `GET /api/contributions`；占比低于 3% 或超出 6 个具名扇区上限的组织并入「其他」扇区（中性灰着色），头部组织始终保留具名扇区，中心显示提交总量。
 
 ### 4.3 交互细节
 
@@ -142,19 +147,19 @@ Routes 结构示意（实现时以此为准）：
 
 ---
 
-## 5. 参会情况页（`/meetings`）设计
+## 5. 参会情况页（`/summits`）设计
 
 ### 5.1 页面结构
 
 ```text
 ┌─ 筛选/锚点条（按年份）──────────────────────────┐
-├─ 会议时间线（垂直线 + 节点卡片）────────────────┤
-│    2026 ●── [会议卡片 A]                        │
+├─ 峰会时间线（垂直线 + 节点卡片）────────────────┤
+│    2026 ●── [峰会卡片 A]                        │
 │         │                                       │
-│    2025 ●── [会议卡片 B]                        │
+│    2025 ●── [峰会卡片 B]                        │
 │         │                                       │
-│    2024 ●── [会议卡片 C]                        │
-├─ 会议详情表格区（每场会议一张表）───────────────┤
+│    2024 ●── [峰会卡片 C]                        │
+├─ 峰会详情表格区（每场峰会一张表）───────────────┤
 │    [表格 1：OpenAN Summit 2026]                 │
 │    [表格 2：OpenAN Hackathon 2025]              │
 └─────────────────────────────────────────────────┘
@@ -162,9 +167,9 @@ Routes 结构示意（实现时以此为准）：
 
 | # | 区块 | 组件 | 数据来源 |
 | --- | --- | --- | --- |
-| 1 | 年份筛选 / 锚点跳转条 | `MeetingAnchorBar` | `GET /api/meetings` 派生的年份集合 |
-| 2 | 会议时间线 | `MeetingTimeline` | `GET /api/meetings` |
-| 3 | 会议详情表格区 | `MeetingDetailTables` | `GET /api/meetings?includeDetail=true` |
+| 1 | 年份筛选 / 锚点跳转条 | `SummitAnchorBar` | `GET /api/summits` 派生的年份集合 |
+| 2 | 峰会时间线 | `SummitTimeline` | `GET /api/summits` |
+| 3 | 峰会详情表格区 | `SummitDetailTables` | `GET /api/summits?includeDetail=true` |
 | 4 | 页脚 | `AppFooter` | 数据更新时间 |
 
 ### 5.2 字段清单
@@ -173,28 +178,30 @@ Routes 结构示意（实现时以此为准）：
 
 | 展示项 | 字段 | 格式 |
 | --- | --- | --- |
-| 会议名称 | `name` | 18px / 500 |
+| 峰会名称 | `name` | 18px / 500 |
+| 简介 | `description` | 14px / 400，次要文本色，最多两行截断 |
 | 时间 | `startDate` ~ `endDate` | `2026年9月18日 - 9月20日` |
 | 地点 | `location` | 城市 + 场馆，`MapPin` 图标前置 |
 | 官网 | `websiteUrl` | "访问官网"链接，新标签打开，`ExternalLink` 图标 |
-| 状态徽标 | `isUpcoming` | 未来会议显示"即将召开"（青色徽标）；已结束显示"已结束"（灰色徽标） |
+| 状态徽标 | `isUpcoming` | 未来峰会显示"即将召开"（青色徽标）；已结束显示"已结束"（灰色徽标） |
 
-#### 会议详情表格字段
+#### 峰会详情表格字段
 
 | 列 / 行标签 | 字段 | 说明 |
 | --- | --- | --- |
-| 会议名称 | `name` | — |
+| 峰会名称 | `name` | — |
+| 简介 | `description` | 一句话简介 |
 | 时间 | `startDate` / `endDate` | — |
 | 地点 | `location` | — |
 | 官网 | `websiteUrl` | 链接 |
 | 参会组织 | `attendingOrganizations[]` | 徽标组展示，超出 6 个折叠为 "+N" |
 | 参会人数 | `attendeeCount` | 数字 |
-| 主办方 | `host` | — |
+| 主办方 | `hostOrgId` / `host` | `hostOrgId` 有效时渲染为组织徽标并可跳转组织档案；否则纯文本展示 `host` |
 | 议程要点 | `agendaHighlights[]` | 有序列表 |
-| 会议成果 | `outcomes[]` | 有序列表 |
+| 峰会成果 | `outcomes[]` | 有序列表 |
 | 记录链接 | `minutesUrl` | 可选，若无则显示"—" |
 
-> 表格采用"**纵向字段表**"形态（左侧字段名、右侧值），比横向宽表在中小屏上更易读；同时为每场会议提供独立 `id` 锚点（`#meeting-<id>`）供锚点条跳转。
+> 表格采用"**纵向字段表**"形态（左侧字段名、右侧值），比横向宽表在中小屏上更易读；同时为每场峰会提供独立 `id` 锚点（`#summit-<id>`）供锚点条跳转。
 
 ### 5.3 交互细节
 
@@ -217,20 +224,20 @@ flowchart TB
 
   O --> P1["HomePage"]
   O --> P2["ActivityPage"]
-  O --> P3["MeetingsPage"]
+  O --> P3["SummitsPage"]
 
   P1 --> S11["HomeMetricSection"] --> C1["MetricCard ×5"]
   P1 --> S12["HomeOrganizationsSection"] --> C2["OrganizationCard ×N"]
-  P1 --> S13["NextMeetingBanner"]
+  P1 --> S13["NextSummitBanner"]
 
   P2 --> S21["ActivityFilterBar"]
   P2 --> S22["ContributionRankChart"]
-  P2 --> S23["ContributionTypePie"]
+  P2 --> S23["ContributionCompositionCard"]
   P2 --> S24["ContributionDetailTable"]
 
-  P3 --> S31["MeetingAnchorBar"]
-  P3 --> S32["MeetingTimeline"] --> C3["MeetingCard ×N"]
-  P3 --> S33["MeetingDetailTables"] --> C4["MeetingDetailTable ×N"]
+  P3 --> S31["SummitAnchorBar"]
+  P3 --> S32["SummitTimeline"] --> C3["SummitCard ×N"]
+  P3 --> S33["SummitDetailTables"] --> C4["SummitDetailTable ×N"]
 ```
 
 ### 6.2 基础 UI 组件（`components/ui/`）
@@ -277,7 +284,7 @@ flowchart TB
 | `useOrganizations(params?)` | GET | `/api/organizations` | `['organizations', params]` |
 | `useContributions(params)` | GET | `/api/contributions` | `['contributions', { from, to, orgIds }]` |
 | `useContributionInsights(params)` | GET | `/api/insights` | `['insights', { from, to, orgIds }]` |
-| `useMeetings(params?)` | GET | `/api/meetings` | `['meetings', { year, includeDetail }]` |
+| `useSummits(params?)` | GET | `/api/summits` | `['summits', { year, includeDetail }]` |
 
 ### 7.3 queryKey 与缓存策略
 
@@ -286,7 +293,7 @@ flowchart TB
 | 首页概览 | 5 min | 30 min | 变更频率低 |
 | 组织列表 | 30 min | 60 min | 极低频变更 |
 | 贡献 / 洞察 | 5 min | 30 min | 会随筛选参数变化 |
-| 会议列表 | 30 min | 60 min | 极低频变更 |
+| 峰会列表 | 30 min | 60 min | 极低频变更 |
 
 **全局默认值**（`QueryClient`）：`retry: 2`（指数退避，间隔 1s/2s）、`refetchOnWindowFocus: false`、`refetchOnReconnect: true`。
 

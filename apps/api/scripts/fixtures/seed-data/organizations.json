@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": [
+    {
+      "orgId": "openan-labs",
+      "name": "OpenAN Labs",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000001?v=4",
+      "homepageUrl": "https://github.com/openan-labs",
+      "type": "community",
+      "tags": ["社区组织", "核心维护"],
+      "aliases": { "github": "openan-labs", "confluence": "OpenAN Labs" },
+      "emailDomains": ["openan.dev"],
+      "joinedAt": "2023-03-01T00:00:00Z",
+      "description": "OpenAN 社区发起方与核心仓库维护者。"
+    },
+    {
+      "orgId": "nova-silicon",
+      "name": "NovaSilicon",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000002?v=4",
+      "homepageUrl": "https://github.com/nova-silicon",
+      "type": "partner",
+      "tags": ["伙伴单位", "芯片", "驱动"],
+      "aliases": { "github": "nova-silicon", "confluence": "NovaSilicon 技术团队" },
+      "emailDomains": ["novasilicon.com"],
+      "joinedAt": "2023-06-15T00:00:00Z",
+      "description": "提供 NPU 驱动与算子库适配，主导异构算力接入方案。"
+    },
+    {
+      "orgId": "harbor-cloud",
+      "name": "HarborCloud",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000003?v=4",
+      "homepageUrl": "https://github.com/harbor-cloud",
+      "type": "partner",
+      "tags": ["伙伴单位", "云原生", "调度"],
+      "aliases": { "github": "harbor-cloud", "confluence": "HarborCloud 云原生组" },
+      "emailDomains": ["harborcloud.io"],
+      "joinedAt": "2024-01-20T00:00:00Z",
+      "description": "参与编排引擎与资源调度模块共建，贡献多集群部署实践。"
+    },
+    {
+      "orgId": "lumen-dev",
+      "name": "Lumen Dev",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000004?v=4",
+      "homepageUrl": "https://github.com/lumen-dev",
+      "type": "external",
+      "tags": ["外部开发者", "文档"],
+      "aliases": { "github": "lumen-dev", "confluence": "Lumen" },
+      "emailDomains": ["lumen.dev"],
+      "description": "独立开发者，长期贡献中文文档与快速上手指南。"
+    },
+    {
+      "orgId": "stellar-foundry",
+      "name": "Stellar Foundry",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000005?v=4",
+      "homepageUrl": "https://github.com/stellar-foundry",
+      "type": "partner",
+      "tags": ["伙伴单位", "工具链"],
+      "aliases": { "github": "stellar-foundry", "confluence": "Stellar Foundry" },
+      "emailDomains": ["stellarfoundry.io"],
+      "description": "共建 CI 流水线与发布自动化工具。"
+    },
+    {
+      "orgId": "orbit-data",
+      "name": "Orbit Data",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000006?v=4",
+      "homepageUrl": "https://github.com/orbit-data",
+      "type": "external",
+      "tags": ["外部开发者", "数据面"],
+      "aliases": { "github": "orbit-data", "confluence": "Orbit Data" },
+      "emailDomains": ["orbitdata.cloud"],
+      "description": "贡献数据面组件与可观测性接入。"
+    },
+    {
+      "orgId": "delta-node",
+      "name": "Delta Node",
+      "logoUrl": "https://avatars.githubusercontent.com/u/0000007?v=4",
+      "homepageUrl": "https://github.com/delta-node",
+      "type": "external",
+      "tags": ["外部开发者", "边缘"],
+      "aliases": { "github": "delta-node", "confluence": "Delta Node" },
+      "emailDomains": ["deltanode.dev"],
+      "description": "边缘节点接入与轻量运行时适配。"
+    },
+    {
+      "orgId": "unattributed",
+      "name": "独立开发者",
+      "logoUrl": "",
+      "homepageUrl": "",
+      "type": "individual",
+      "tags": ["独立开发者"],
+      "description": "未归属到任何组织的独立贡献者聚合（伪组织）。"
+    }
+  ]
+}

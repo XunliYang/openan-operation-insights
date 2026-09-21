@@ -1,0 +1,141 @@
+{
+  "_comment": "离线采集固定数据：用于无 GITHUB_TOKEN 时验证聚合/归属/落盘全链路。配合 GITHUB_FIXTURE=scripts/fixtures/github-records.sample.json 使用。commitEmail 模拟 PR 首提交作者邮箱，author.email 模拟账户公开资料邮箱。",
+  "records": [
+    {
+      "kind": "pullRequest",
+      "repository": "openan-labs/core",
+      "author": {
+        "login": "openan-labs",
+        "githubId": 1001,
+        "name": "OpenAN Labs",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/1001?v=4",
+        "url": "https://github.com/openan-labs"
+      },
+      "linesChanged": 120,
+      "timestamp": "2026-08-02T10:00:00Z",
+      "commitEmail": null,
+      "commitCount": 12
+    },
+    {
+      "kind": "pullRequest",
+      "repository": "openan-labs/core",
+      "author": {
+        "login": "openan-labs",
+        "githubId": 1001,
+        "name": "OpenAN Labs",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/1001?v=4",
+        "url": "https://github.com/openan-labs"
+      },
+      "linesChanged": 8,
+      "timestamp": "2026-08-15T10:00:00Z",
+      "commitEmail": null,
+      "commitCount": 3
+    },
+    {
+      "kind": "issue",
+      "repository": "openan-labs/docs",
+      "author": {
+        "login": "openan-labs",
+        "githubId": 1001,
+        "name": "OpenAN Labs",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/1001?v=4",
+        "url": "https://github.com/openan-labs"
+      },
+      "linesChanged": 0,
+      "timestamp": "2026-08-20T10:00:00Z",
+      "commitCount": 0
+    },
+    {
+      "kind": "pullRequest",
+      "repository": "openan-labs/kernel",
+      "author": {
+        "login": "nova-silicon",
+        "githubId": 1002,
+        "name": "NovaSilicon",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/1002?v=4",
+        "url": "https://github.com/nova-silicon"
+      },
+      "linesChanged": 250,
+      "timestamp": "2026-08-05T10:00:00Z",
+      "commitEmail": null,
+      "commitCount": 30
+    },
+    {
+      "kind": "pullRequest",
+      "repository": "openan-labs/core",
+      "author": {
+        "login": "solo-hacker",
+        "githubId": 2001,
+        "name": "Solo Hacker",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/2001?v=4",
+        "url": "https://github.com/solo-hacker"
+      },
+      "linesChanged": 40,
+      "timestamp": "2026-08-11T10:00:00Z",
+      "commitEmail": "solo-hacker@users.noreply.github.com",
+      "commitCount": 2
+    },
+    {
+      "kind": "issue",
+      "repository": "openan-labs/core",
+      "author": {
+        "login": "aria-dev",
+        "githubId": 2002,
+        "name": "Aria Dev",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/2002?v=4",
+        "url": "https://github.com/aria-dev"
+      },
+      "linesChanged": 0,
+      "timestamp": "2026-08-12T10:00:00Z",
+      "commitCount": 0
+    },
+    {
+      "kind": "pullRequest",
+      "repository": "openan-labs/core",
+      "author": {
+        "login": "nora-kim",
+        "githubId": 2003,
+        "name": "Nora Kim",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/2003?v=4",
+        "url": "https://github.com/nora-kim",
+        "email": null
+      },
+      "linesChanged": 30,
+      "timestamp": "2026-08-18T10:00:00Z",
+      "commitEmail": "nora@mail.novasilicon.com",
+      "commitCount": 5
+    },
+    {
+      "kind": "pullRequest",
+      "repository": "openan-labs/docs",
+      "author": {
+        "login": "pierre-dev",
+        "githubId": 2004,
+        "name": "Pierre Dev",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/2004?v=4",
+        "url": "https://github.com/pierre-dev",
+        "email": "pierre@lumen.dev"
+      },
+      "linesChanged": 16,
+      "timestamp": "2026-08-19T10:00:00Z",
+      "commitEmail": null,
+      "commitCount": 4
+    },
+    {
+      "kind": "pullRequest",
+      "repository": "openan-labs/core",
+      "author": {
+        "login": "tomas-x",
+        "githubId": 2005,
+        "name": "Tomas X",
+        "avatarUrl": "https://avatars.githubusercontent.com/u/2005?v=4",
+        "url": "https://github.com/tomas-x",
+        "email": "tomas@lumen.dev"
+      },
+      "linesChanged": 24,
+      "timestamp": "2026-08-21T10:00:00Z",
+      "commitEmail": "tomas@novasilicon.com",
+      "commitCount": 6
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": [
+    {
+      "id": "openan-summit-2026",
+      "name": "OpenAN Summit 2026",
+      "startDate": "2026-11-12T00:00:00Z",
+      "endDate": "2026-11-14T00:00:00Z",
+      "location": "上海 · 世博中心",
+      "websiteUrl": "https://openan.example.org/summit/2026",
+      "isUpcoming": true,
+      "description": "OpenAN 社区年度旗舰峰会，发布年度技术路线图与共建成果。",
+      "hostOrgId": null,
+      "host": "OpenAN 社区委员会",
+      "attendeeCount": 640,
+      "attendingOrganizations": [
+        "OpenAN Labs", "NovaSilicon", "HarborCloud", "Lumen Dev", "Ferro Systems", "Atlas Compute"
+      ],
+      "agendaHighlights": [
+        "异构算力统一接入方案年度进展",
+        "编排引擎 2.0 架构发布",
+        "社区治理与 SIG 运作机制升级"
+      ],
+      "outcomes": [
+        "发布编排引擎 2.0 路线图",
+        "新增 6 家伙伴单位签署共建协议"
+      ],
+      "minutesUrl": "https://openan.example.org/summit/2026/minutes"
+    },
+    {
+      "id": "openan-hackathon-2025",
+      "name": "OpenAN Developer Hackathon 2025",
+      "startDate": "2025-08-22T00:00:00Z",
+      "endDate": "2025-08-24T00:00:00Z",
+      "location": "深圳 · 南山科技园",
+      "websiteUrl": "https://openan.example.org/hackathon/2025",
+      "isUpcoming": false,
+      "description": "面向开发者的 48 小时极限创作马拉松，聚焦 NPU 与调度实战。",
+      "hostOrgId": "openan-labs",
+      "host": "OpenAN Labs",
+      "attendeeCount": 218,
+      "attendingOrganizations": ["OpenAN Labs", "NovaSilicon", "HarborCloud", "Lumen Dev"],
+      "agendaHighlights": [
+        "NPU DRA 插件实战工作坊",
+        "社区贡献者闪电演讲",
+        "48 小时应用案例开发赛"
+      ],
+      "outcomes": [
+        "产出 23 个可运行的应用案例原型",
+        "12 名外部开发者成为常驻贡献者"
+      ],
+      "minutesUrl": "https://openan.example.org/hackathon/2025/minutes"
+    }
+  ]
+}

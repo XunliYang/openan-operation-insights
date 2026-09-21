@@ -40,8 +40,8 @@
 OpenAN 是一个开放协作社区，其运营工作长期面临信息分散的问题：
 
 - 社区规模数据（伙伴数、开发者数、应用案例数）散落在文档与人工统计表中；
-- 各成员单位对社区的贡献（PR、Issue、代码量、需求、最佳实践、局点）缺少统一口径的汇总视图；
-- 历次会议信息（时间、地点、官网、参会组织）缺少可检索、可追溯的沉淀载体。
+- 各成员单位对社区的贡献（PR、Issue、代码量、需求、最佳实践）缺少统一口径的汇总视图；
+- 历次峰会信息（时间、地点、官网、参会组织）缺少可检索、可追溯的沉淀载体。
 
 本平台将这些信息集中到一个**后台看板式网站**中，供社区运营团队与成员单位查看。网站结构极其简单——顶部导航栏 + 内容区，三个一级页面：
 
@@ -49,7 +49,7 @@ OpenAN 是一个开放协作社区，其运营工作长期面临信息分散的�
 | --- | --- | --- |
 | 首页 | `/` | 一屏看清社区整体规模与最近动态 |
 | 社区活跃度情况 | `/activity` | 按组织维度对比贡献度 |
-| 参会情况 | `/meetings` | 时间线回顾历次会议并查看明细 |
+| 参会情况 | `/summits` | 时间线回顾历次峰会并查看明细 |
 
 ---
 
@@ -61,9 +61,9 @@ mindmap
     首页
       社区伙伴数量
       外部开发者数量
-      参加的会议
+      参加的峰会
       应用案例
-      下一次会议
+      下一次峰会
       贡献的组织
     社区活跃度
       GitHub 维度
@@ -73,14 +73,13 @@ mindmap
       Confluence 维度
         需求
         best-practice 案例
-        局点
     参会情况
-      会议时间线
-        会议名称
+      峰会时间线
+        峰会名称
         时间
         地点
         官网
-      会议详情表格
+      峰会详情表格
         参会组织
         参会人数
         议程与成果
@@ -172,13 +171,13 @@ flowchart TB
 | 前端样式 | Tailwind CSS + tailwind-merge + tailwindcss-animate | 3.4.17 | 原子化样式，便于统一卡片/表格/时间线视觉语言 |
 | 前端组件 | shadcn/ui 风格本地组件 | — | 组件源码内置于仓库，可完全掌控视觉细节 |
 | 前端图标 | lucide-react、react-icons | — | 图标统一来源 |
-| 前端图表 | Recharts / ECharts | — | 组织贡献排行条形图、贡献类型占比环形图 |
+| 前端图表 | Recharts / ECharts | — | 组织贡献排行条形图、组织贡献占比环形图 |
 | 后端框架 | NestJS | 10.x | 用户指定 Node.js；模块化 + DI 天然适配"可替换数据提供者"诉求 |
 | 后端语言 | TypeScript | 5.x | 与前端共享类型定义与契约 |
 | 入参校验 | class-validator / class-transformer | — | DTO 白名单校验与类型转换 |
 | 配置管理 | @nestjs/config | — | 环境变量集中管理与校验 |
-| 缓存（预留） | @nestjs/cache-manager（内存实现） | — | 真实采集阶段降低外部 API 调用量 |
-| 外部 SDK（预留） | @octokit/rest、Confluence REST | — | 本期仅定义端口与适配器占位 |
+| 缓存（预留） | @nestjs/cache-manager（内存实现） | — | 降低接口重复读取开销；上游限流应对在采集侧（见 05 文档 2.5 节） |
+| 外部调用 | 原生 `fetch`（无第三方 SDK） | — | 采集器直连 GitHub GraphQL，未引入 `@octokit` |
 | 数据存储 | **JSON 文件**（`data/*.json`） | — | 用户指定，不引入数据库 |
 | 文档产出 | Markdown（`docs/`） | — | 本期唯一交付物 |
 
@@ -189,12 +188,12 @@ flowchart TB
 | 维度 | NestJS | Express | 结论 |
 | --- | --- | --- | --- |
 | 模块边界 | 内置 Module，天然按业务域隔离 | 需手工组织目录与路由注册 | NestJS 胜 |
-| 依赖注入 | 内置 IoC 容器，`provide/useClass` 一行切换实现 | 需引入第三方或手工工厂 | **NestJS 决定性优势**：端口-适配器切换只需改一个 Token 绑定 |
+| 依赖注入 | 内置 IoC 容器，`provide/useClass` 一行切换实现 | 需引入第三方或手工工厂 | NestJS 胜：绑定集中于 `ProvidersModule`，业务模块零改动 |
 | 横切关注点 | Guard / Interceptor / Pipe / Filter 一等公民 | 需自行串联中间件 | NestJS 胜 |
 | 学习成本 | 略高，概念较多 | 极低 | Express 胜 |
 | 与前端语言一致性 | 同为 TS，可共享 `types` 包 | 同 | 平 |
 
-**决策**：选 NestJS。本项目最核心的架构诉求是"本阶段用 Mock/JSON、后续换成真实 GitHub/Confluence，且业务与前端零改动"。NestJS 的 DI 容器使这一诉求的实现成本极低。
+**决策**：选 NestJS。本项目最核心的架构诉求是"本阶段用 JSON 种子数据、后续换成真实 GitHub/Confluence 数据，且业务层与前端零改动"。实现分两层：DI 容器让"换实现"成为一行配置（用于更换存储、或确需直连上游时）；而数据源接入本身走读写分离（采集器写、接口读，见 7.1 节），因此 `Service` 与 `Controller` 在三个阶段中代码完全不变。
 
 #### 6.2.2 数据存储为什么可以用纯 JSON 文件
 
@@ -206,7 +205,7 @@ flowchart TB
 | 查询能力 | 全量加载到内存后过滤 | SQL | SQL + 索引 |
 | 适用数据量 | ≤ 万级记录 | ≤ 百万级 | 无上限 |
 
-**决策**：选 JSON 文件。当前数据规模极小（组织数十个、会议十余场），且写入频率极低（人工维护或定时采集）。关键在于**用 Repository 抽象包住读写**，使存储实现可替换——后续若数据量增长，只需新增一个 `Prisma*Repository` 实现同一接口。
+**决策**：选 JSON 文件。当前数据规模极小（组织数十个、峰会十余场），且写入频率极低（人工维护或定时采集）。关键在于**用 Repository 抽象包住读写**，使存储实现可替换——后续若数据量增长，只需新增一个 `Prisma*Repository` 实现同一接口。
 
 #### 6.2.3 前端为什么统一走接口而不在前端写死常量
 
@@ -223,17 +222,18 @@ flowchart TB
 ```mermaid
 flowchart LR
   S["ActivityService<br/>（业务逻辑）"] -->|依赖| P["ContributionPort<br/>（接口）"]
-  P -.->|DI Token 绑定| A1["JsonContributionProvider<br/>✅ 本期启用"]
-  P -.->|DI Token 绑定| A2["GithubContributionProvider<br/>⏳ 阶段三"]
+  P -->|DI Token 绑定| A1["JsonContributionProvider<br/>（唯一实现）"]
   A1 --> D[("data/contributions.json")]
-  A2 --> G[("GitHub API")]
+  G[("GitHub API")] -->|GraphQL| C["collector/<br/>（独立采集上下文）"]
+  C -->|映射后写入，唯一写入方| D
 ```
 
 **收益**：
 
 - 业务逻辑对数据来源无感知，不因字段口径变化而修改；
 - 单元测试可注入 `InMemoryProvider`，无需 mock HTTP；
-- 切换数据源是一个 **1 行的模块配置变更**，不是一次重构。
+- 更换实现（如存储由 JSON 换成数据库）是一个 **1 行的模块配置变更**，不是一次重构；
+- 接入真实数据源则**连这一行都不需要**：采集器写入同一份 JSON 结构，端口实现保持不变（见 7.3 节与 05 文档 2.5 节）。
 
 ### 7.2 原则二：契约优先（Contract First）
 
@@ -269,10 +269,10 @@ flowchart TB
     direction LR
     N1["React 组件"] -->|同一 useQuery| N2["同一 GET 接口"]
     N2 --> N3["同一 HomeService"]
-    N3 --> N4["HomeMetricPort<br/>（采集实现）"]
-    N4 --> N5[("采集结果")]
+    N3 --> N4["HomeMetricPort<br/>（仍为 JSON 实现）"]
+    N4 --> N5[("data/home.json<br/>由采集器写入")]
   end
-  方案B -.->|仅替换适配器绑定| 未来
+  方案B -.->|仅数据写入方变化，代码不变| 未来
 ```
 
 ### 7.4 原则四：统一响应信封（Envelope）
@@ -343,11 +343,11 @@ flowchart LR
 | 后端模块 | kebab-case 目录 + PascalCase 类 | `modules/home/home.module.ts` |
 | Controller / Service | PascalCase + 后缀 | `HomeController`、`ActivityService` |
 | Provider 端口 | PascalCase + `Port` 后缀 | `ContributionPort` |
-| Provider 适配器 | `来源 + 业务 + Provider` | `JsonContributionProvider`、`GithubContributionProvider` |
+| Provider 适配器 | `来源 + 业务 + Provider` | `JsonContributionProvider`、`JsonSummitProvider` |
 | DI Token | 大写下划线常量 | `CONTRIBUTION_PORT` |
 | DTO | PascalCase + `Dto` 后缀 | `GetContributionsQueryDto` |
 | JSON 数据文件 | 全小写，单数名词 | `home.json`、`organizations.json` |
-| API 路径 | 全小写，复数资源名 | `/api/meetings`、`/api/organizations` |
+| API 路径 | 全小写，复数资源名 | `/api/summits`、`/api/organizations` |
 | 时间字段 | ISO 8601 字符串，UTC | `"2026-09-18T09:00:00Z"` |
 | 布尔字段 | `is` / `has` 前缀 | `isUpcoming`、`hasDetail` |
 
@@ -366,11 +366,12 @@ openan-operation-insights/
 │   └── 05-integration-roadmap.md
 │
 ├── data/                                  # JSON 种子数据（运行时被后端读取）
-│   ├── home.json                          # 首页指标 + 下一次会议
+│   ├── home.json                          # 首页指标 + 下一次峰会
 │   ├── organizations.json                 # 组织档案（伙伴 / 外部开发者）
 │   ├── contributions.json                 # 组织 × 贡献指标（GitHub 类）
 │   ├── insights.json                      # 组织 × Confluence 类指标
-│   └── meetings.json                      # 会议列表 + 详情
+│   ├── contributors.json                  # 个人贡献者档案（GitHub 账号维度）
+│   └── summits.json                      # 峰会列表 + 详情
 │
 ├── apps/
 │   ├── web/                               # React 18 + TS + Vite
@@ -380,7 +381,7 @@ openan-operation-insights/
 │   │       ├── main.tsx
 │   │       ├── App.tsx                    # 路由表
 │   │       ├── layouts/AppLayout.tsx      # Navbar + <Outlet/> + Footer
-│   │       ├── pages/                     # HomePage / ActivityPage / MeetingsPage
+│   │       ├── pages/                     # HomePage / ActivityPage / SummitsPage
 │   │       ├── sections/                  # 页面内区块（一区块一文件）
 │   │       ├── components/ui/             # Button / Card / Table / Badge / Skeleton …
 │   │       ├── features/                  # 按业务域的 hooks + api 封装
@@ -394,11 +395,12 @@ openan-operation-insights/
 │       │   ├── modules/
 │       │   │   ├── home/                  # home.module / controller / service
 │       │   │   ├── activity/
-│       │   │   └── meeting/
+│       │   │   └── summit/
 │       │   ├── providers/                 # ★ 端口接口 + 适配器实现
-│       │   │   ├── contribution.port.ts
-│       │   │   ├── json-contribution.provider.ts
-│       │   │   └── github-contribution.provider.ts   # 阶段三
+│       │   │   ├── ports/                 # contribution.port.ts 等纯接口
+│       │   │   ├── json/                  # json-*.provider.ts（唯一实现）
+│       │   │   └── providers.module.ts    # 端口 → 适配器绑定
+│       │   ├── collector/                 # ★ 采集器（独立上下文，写 data/*.json）
 │       │   ├── repositories/              # JsonRepository（原子写 + 串行队列）
 │       │   ├── common/                    # 响应包装 / 异常过滤器 / 错误码
 │       │   └── config/                    # 配置加载与校验
@@ -421,7 +423,7 @@ openan-operation-insights/
 | 质量属性 | 目标 | 保障手段 |
 | --- | --- | --- |
 | 可维护性 | 新增一个数据源不改业务层 | Provider 端口 + DI Token |
-| 可演进性 | 硬编码 → 真实采集，前端零改动 | 契约优先 + 单一数据入口 |
+| 可演进性 | 种子数据 → 真实采集，前端与业务层零改动 | 契约优先 + 单一数据入口 + 读写分离 |
 | 性能 | 页面接口 P95 < 100ms（本地数据） | JSON 内存缓存、前端 Query 缓存 |
 | 可靠性 | JSON 文件不因并发写损坏 | 原子写 + 串行写队列 + schema 校验 |
 | 安全性 | 凭据不泄漏到前端 | 凭据仅后端环境变量；`VITE_` 前缀禁令 |

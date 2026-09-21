@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-21T10:53:35.889Z",
+  "data": {
+    "partnerCount": {
+      "value": 10,
+      "unit": "家",
+      "delta": 3,
+      "deltaDirection": "up"
+    },
+    "externalDeveloperCount": {
+      "value": 13,
+      "unit": "人",
+      "delta": 26,
+      "deltaDirection": "up"
+    },
+    "summitCount": {
+      "value": 1,
+      "unit": "场",
+      "delta": 1,
+      "deltaDirection": "up"
+    },
+    "useCaseCount": {
+      "value": 3,
+      "unit": "个",
+      "delta": 5,
+      "deltaDirection": "up"
+    },
+    "nextSummitId": "one-summit-2026"
+  }
+}

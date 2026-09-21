@@ -1,0 +1,51 @@
+/**
+ * 启动期环境变量校验（fail-fast）。
+ * 本期所有变量均非必填，仅校验"提供了就必须合法"的项，
+ * 以及阶段三接入时才会强制的成对约束。
+ */
+export function validateEnv(raw: Record<string, unknown>): Record<string, unknown> {
+  const errors: string[] = [];
+
+  const port = raw.PORT;
+  if (port !== undefined && port !== '') {
+    const parsed = Number.parseInt(String(port), 10);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
+      errors.push(`PORT 必须是 1-65535 之间的整数，当前值：${String(port)}`);
+    }
+  }
+
+  const ttl = raw.CACHE_TTL_SECONDS;
+  if (ttl !== undefined && ttl !== '') {
+    const parsed = Number.parseInt(String(ttl), 10);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      errors.push(`CACHE_TTL_SECONDS 必须是非负整数，当前值：${String(ttl)}`);
+    }
+  }
+
+  const lookback = raw.GITHUB_LOOKBACK_DAYS;
+  if (lookback !== undefined && lookback !== '') {
+    const parsed = Number.parseInt(String(lookback), 10);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      errors.push(`GITHUB_LOOKBACK_DAYS 必须是正整数，当前值：${String(lookback)}`);
+    }
+  }
+
+  const nodeEnv = raw.NODE_ENV;
+  if (nodeEnv !== undefined && !['development', 'production', 'test'].includes(String(nodeEnv))) {
+    errors.push(`NODE_ENV 只能是 development / production / test，当前值：${String(nodeEnv)}`);
+  }
+
+  // 阶段三成对约束：只配置了一半即为配置错误，提前暴露而不是运行时报错。
+  if (raw.GITHUB_TOKEN && !raw.GITHUB_ORGS && !raw.GITHUB_REPOS) {
+    errors.push('已配置 GITHUB_TOKEN，但 GITHUB_ORGS 与 GITHUB_REPOS 均为空，无法确定采集范围');
+  }
+  if (raw.CONFLUENCE_TOKEN && !raw.CONFLUENCE_BASE_URL) {
+    errors.push('已配置 CONFLUENCE_TOKEN，但缺少 CONFLUENCE_BASE_URL');
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`环境变量校验失败：\n  - ${errors.join('\n  - ')}`);
+  }
+
+  return raw;
+}
