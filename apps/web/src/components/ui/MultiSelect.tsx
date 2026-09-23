@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
+import { useI18n } from '@/i18n/context';
 import { IconChevronDown, IconSearch } from '@/components/icons';
 
 export interface MultiSelectOption {
@@ -22,13 +23,16 @@ export function MultiSelect({
   options,
   value,
   onChange,
-  placeholder = '全部',
+  placeholder,
   searchable = true,
   className,
 }: MultiSelectProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const resolvedPlaceholder = placeholder ?? t('common.multiSelect.all');
 
   useEffect(() => {
     if (!open) return;
@@ -65,7 +69,11 @@ export function MultiSelect({
   };
 
   const buttonLabel =
-    value.length === 0 ? placeholder : value.length === 1 ? (options.find((o) => o.value === value[0])?.label ?? '1 项') : `已选 ${value.length} 项`;
+    value.length === 0
+      ? resolvedPlaceholder
+      : value.length === 1
+        ? (options.find((o) => o.value === value[0])?.label ?? t('common.multiSelect.one'))
+        : t('common.multiSelect.selectedCount', { count: value.length });
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
@@ -99,7 +107,7 @@ export function MultiSelect({
               }}
               className="rounded-md px-1 text-[0.68rem] text-slate-400 transition hover:bg-white/10 hover:text-slate-100"
             >
-              清除
+              {t('common.multiSelect.clear')}
             </span>
           ) : null}
           <IconChevronDown
@@ -127,7 +135,7 @@ export function MultiSelect({
                   autoFocus
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
-                  placeholder="搜索组织"
+                  placeholder={t('common.multiSelect.search')}
                   className="h-8 w-full rounded-lg border border-white/10 bg-white/[0.04] pl-8 pr-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-brand-400/50 focus:outline-none"
                 />
               </span>
@@ -136,7 +144,7 @@ export function MultiSelect({
 
           <ul className="max-h-64 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <li className="px-3 py-4 text-center text-xs text-slate-500">无匹配项</li>
+              <li className="px-3 py-4 text-center text-xs text-slate-500">{t('common.multiSelect.noMatch')}</li>
             ) : (
               filtered.map((option) => {
                 const checked = value.includes(option.value);

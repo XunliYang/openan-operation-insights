@@ -7,6 +7,7 @@ import { SearchInput } from '@/components/ui/Field';
 import { IconExternal, IconFile, IconPullRequest } from '@/components/icons';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatNumber } from '@/lib/format';
+import { useI18n } from '@/i18n/context';
 import { sortRows, type ActivityRow, type SortKey } from './merge';
 
 const COLUMNS: Array<{ key: SortKey; label: string; align?: 'right' }> = [
@@ -28,6 +29,7 @@ export interface ActivityTableProps {
 }
 
 export function ActivityTable({ rows, isLoading, isError, error, onRetry }: ActivityTableProps) {
+  const { locale } = useI18n();
   const [sortKey, setSortKey] = useState<SortKey>('pullRequests');
   const [direction, setDirection] = useState<'asc' | 'desc'>('desc');
   const [keyword, setKeyword] = useState('');
@@ -37,8 +39,8 @@ export function ActivityTable({ rows, isLoading, isError, error, onRetry }: Acti
     const filtered = kw
       ? rows.filter((row) => row.orgName.toLowerCase().includes(kw))
       : rows;
-    return sortRows(filtered, sortKey, direction);
-  }, [rows, keyword, sortKey, direction]);
+    return sortRows(filtered, sortKey, direction, locale);
+  }, [rows, keyword, sortKey, direction, locale]);
 
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {

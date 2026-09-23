@@ -9,6 +9,22 @@
       content="OpenAN 社区运营洞察平台 —— 伙伴共建、社区活跃度与峰会参与情况的统一视图"
     />
     <title>OpenAN 运营洞察</title>
+    <script>
+      // 首帧渲染前同步读取 localStorage 的语言并校正 lang / title，避免默认中文闪烁。
+      (function () {
+        var locale = 'zh-CN';
+        try {
+          var stored = localStorage.getItem('openan.locale');
+          if (stored === 'zh-CN' || stored === 'en-US') locale = stored;
+        } catch (e) {
+          /* 隐私模式下 localStorage 不可用，回退中文 */
+        }
+        var lang = locale === 'en-US' ? 'en-US' : 'zh-CN';
+        document.documentElement.lang = lang;
+        document.title =
+          lang === 'en-US' ? 'OpenAN Operations Insights' : 'OpenAN 运营洞察';
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

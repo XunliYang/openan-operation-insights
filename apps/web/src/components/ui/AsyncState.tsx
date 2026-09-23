@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ErrorState, EmptyState } from './States';
+import { useI18n } from '@/i18n/context';
 
 export interface AsyncStateProps {
   isLoading: boolean;
@@ -26,11 +27,14 @@ export function AsyncState({
   isEmpty = false,
   onRetry,
   skeleton,
-  emptyTitle = '暂无数据',
+  emptyTitle,
   emptyHint,
   compact = false,
   children,
 }: AsyncStateProps) {
+  const { t } = useI18n();
+  const resolvedEmptyTitle = emptyTitle ?? t('common.state.empty');
+
   if (isLoading) return <>{skeleton}</>;
 
   if (isError) {
@@ -40,7 +44,7 @@ export function AsyncState({
   if (isEmpty) {
     return (
       <EmptyState
-        title={emptyTitle}
+        title={resolvedEmptyTitle}
         hint={emptyHint}
         className={compact ? 'px-4 py-8' : undefined}
       />
