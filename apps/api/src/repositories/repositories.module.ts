@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   Contributor,
   HomeFileData,
+  MeetingAttendanceMatrix,
   SummitDetail,
   Organization,
   OrganizationContribution,
@@ -15,6 +16,7 @@ import {
   CONTRIBUTORS_REPOSITORY,
   HOME_REPOSITORY,
   INSIGHTS_REPOSITORY,
+  MEETINGS_REPOSITORY,
   SUMMITS_REPOSITORY,
   ORGANIZATIONS_REPOSITORY,
 } from './repository.tokens';
@@ -23,6 +25,7 @@ import {
   isContributorArray,
   isHomeFileData,
   isInsightArray,
+  isMeetingAttendanceMatrix,
   isSummitDetailArray,
   isOrganizationArray,
 } from './validators';
@@ -77,10 +80,18 @@ const repositoryProviders = [
     useFactory: makeRepository<SummitDetail[]>('summits.json', isSummitDetailArray),
     inject: [ConfigService],
   },
+  {
+    provide: MEETINGS_REPOSITORY,
+    useFactory: makeRepository<MeetingAttendanceMatrix>(
+      'meetings.json',
+      isMeetingAttendanceMatrix,
+    ),
+    inject: [ConfigService],
+  },
 ];
 
 /**
- * 启动期数据自检：校验五个业务 JSON 文件的结构合法性。
+ * 启动期数据自检：校验七个业务 JSON 文件的结构合法性。
  * 校验失败不阻断启动（降级只读），由具体接口返回 50001。
  */
 export class DataBootstrapService implements OnApplicationBootstrap {
@@ -94,6 +105,8 @@ export class DataBootstrapService implements OnApplicationBootstrap {
     @Inject(INSIGHTS_REPOSITORY) private readonly insights: JsonRepository<OrganizationInsight[]>,
     @Inject(CONTRIBUTORS_REPOSITORY) private readonly contributors: JsonRepository<Contributor[]>,
     @Inject(SUMMITS_REPOSITORY) private readonly summits: JsonRepository<SummitDetail[]>,
+    @Inject(MEETINGS_REPOSITORY)
+    private readonly meetings: JsonRepository<MeetingAttendanceMatrix>,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -104,6 +117,7 @@ export class DataBootstrapService implements OnApplicationBootstrap {
       this.insights,
       this.contributors,
       this.summits,
+      this.meetings,
     ] as const;
 
     const results = await Promise.all(
@@ -137,6 +151,7 @@ export class DataBootstrapService implements OnApplicationBootstrap {
     INSIGHTS_REPOSITORY,
     CONTRIBUTORS_REPOSITORY,
     SUMMITS_REPOSITORY,
+    MEETINGS_REPOSITORY,
   ],
 })
 export class RepositoriesModule {}

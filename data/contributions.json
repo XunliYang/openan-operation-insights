@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-21T10:53:35.880Z",
+  "updatedAt": "2026-09-21T12:21:02.584Z",
   "data": [
     {
       "orgId": "cmcc",
@@ -14,7 +14,7 @@
         "linesChanged": 24440,
         "repos": 3
       },
-      "updatedAt": "2026-09-21T10:53:35.879Z"
+      "updatedAt": "2026-09-21T12:21:02.582Z"
     },
     {
       "orgId": "huawei",
@@ -28,7 +28,7 @@
         "linesChanged": 851335,
         "repos": 13
       },
-      "updatedAt": "2026-09-21T10:53:35.879Z"
+      "updatedAt": "2026-09-21T12:21:02.582Z"
     },
     {
       "orgId": "zte",
@@ -42,7 +42,7 @@
         "linesChanged": 2962,
         "repos": 1
       },
-      "updatedAt": "2026-09-21T10:53:35.879Z"
+      "updatedAt": "2026-09-21T12:21:02.582Z"
     },
     {
       "orgId": "unattributed",
@@ -56,7 +56,7 @@
         "linesChanged": 35841,
         "repos": 11
       },
-      "updatedAt": "2026-09-21T10:53:35.879Z"
+      "updatedAt": "2026-09-21T12:21:02.582Z"
     }
   ]
 }

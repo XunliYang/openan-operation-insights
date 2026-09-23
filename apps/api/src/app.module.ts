@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ActivityModule } from './modules/activity/activity.module';
 import { HomeModule } from './modules/home/home.module';
+import { MeetingModule } from './modules/meeting/meeting.module';
 import { SummitModule } from './modules/summit/summit.module';
 import { OrganizationModule } from './modules/organization/organization.module';
 import { CommonModule } from './common/common.module';
@@ -26,6 +27,7 @@ import { RepositoriesModule } from './repositories/repositories.module';
     OrganizationModule,
     ActivityModule,
     SummitModule,
+    MeetingModule,
   ],
 })
 export class AppModule {}

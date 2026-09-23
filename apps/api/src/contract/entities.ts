@@ -134,3 +134,23 @@ export interface ContributionSummaryData {
   orgCount: number;
   updatedAt: string;
 }
+
+/**
+ * 例会参会矩阵（ADR-0005）—— 无主键、无规范化、无聚合。
+ * 直接照搬运营台账：列为人名原文、行为日期，格子表示是否出席。
+ */
+export interface MeetingAttendanceRow {
+  /** 例会日期，`YYYY-MM-DD` */
+  date: string;
+  /** 出席标记，与 columns 等长、同序（true=出席，false=缺席） */
+  attendance: boolean[];
+}
+
+export interface MeetingAttendanceMatrix {
+  /** 列头：人名原文（照搬台账，保留原序与原文） */
+  columns: string[];
+  /** 每次例会一行，保持台账原序（不在接口层排序） */
+  rows: MeetingAttendanceRow[];
+  /** 台账最后同步时间（ISO 8601），由采集脚本写入 */
+  updatedAt?: string;
+}

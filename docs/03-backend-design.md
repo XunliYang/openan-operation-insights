@@ -32,6 +32,7 @@ flowchart TB
   APP --> HOME["HomeModule"]
   APP --> ACT["ActivityModule"]
   APP --> MTG["SummitModule"]
+  APP --> MEETING["MeetingModule"]
   APP --> ORG["OrganizationModule"]
   APP --> PROV["ProvidersModule<br/>端口 Token 绑定与适配器注册"]
   APP --> REPO["RepositoriesModule<br/>JsonRepository 工厂"]
@@ -39,6 +40,7 @@ flowchart TB
   HOME --> PROV
   ACT --> PROV
   MTG --> PROV
+  MEETING --> PROV
   ORG --> PROV
   PROV --> REPO
 ```
@@ -51,7 +53,8 @@ flowchart TB
 | `OrganizationModule` | `OrganizationController` | `OrganizationService` | `ORGANIZATION_PORT`、`CONTRIBUTION_PORT` | 组织档案与筛选 |
 | `ActivityModule` | `ActivityController` | `ActivityService` | `CONTRIBUTION_PORT`、`INSIGHT_PORT` | 贡献明细、成果洞察、贡献聚合 |
 | `SummitModule` | `SummitController` | `SummitService` | `SUMMIT_PORT` | 峰会列表、时间线、详情 |
-| `ProvidersModule` | — | — | — | 集中声明所有端口 Token → 适配器类的绑定；当前五个端口**恒为 JSON 实现**，采集不经此切换（见 2.3 节） |
+| `MeetingModule` | `MeetingController` | `MeetingService` | `MEETING_ATTENDANCE_PORT` | 例会参会矩阵（**纯透传**，无口径计算） |
+| `ProvidersModule` | — | — | — | 集中声明所有端口 Token → 适配器类的绑定；当前六个端口**恒为 JSON 实现**，采集不经此切换（见 2.3 节） |
 | `RepositoriesModule` | — | — | — | 提供 `JsonRepository<T>` 实例（按文件名注入） |
 | `CommonModule` | — | — | — | 全局响应拦截器、异常过滤器、错误码枚举 |
 
@@ -82,7 +85,8 @@ apps/api/src/
 │   │   ├── organization.port.ts
 │   │   ├── contribution.port.ts
 │   │   ├── insight.port.ts
-│   │   └── summit.port.ts
+│   │   ├── summit.port.ts
+│   │   └── meeting-attendance.port.ts
 │   ├── tokens.ts                    # 所有 DI Token 常量
 │   ├── json/                        # 当前唯一实现（读 data/*.json）
 │   └── providers.module.ts          # 端口 → 适配器绑定（换存储 / 直连上游时才动）
@@ -96,11 +100,13 @@ apps/api/src/
 │   ├── graphql-github.source.ts     # 真实实现（原生 fetch 调 GitHub GraphQL）
 │   ├── fixture-github.source.ts     # 离线实现（GITHUB_FIXTURE，无 token 自检用）
 │   └── sync-state.store.ts          # data/.sync-state.json 游标读写
+├── scripts/                         # 辅助脚本（import-meetings.ts：xlsx → meetings.json）
 └── modules/
     ├── home/
     ├── organization/
     ├── activity/
-    └── summit/
+    ├── summit/
+    └── meeting/
 ```
 
 ---
@@ -269,7 +275,30 @@ export interface SummitPort {
 }
 ```
 
-### 4.5 DI Token 与绑定切换
+### 4.5 例会参会矩阵端口
+
+```ts
+// providers/ports/meeting-attendance.port.ts
+/** 例会参会矩阵：行 = 日期，列 = 人名（照搬 Excel 台账，见 ADR-0005） */
+export interface MeetingAttendanceRow {
+  date: string;          // YYYY-MM-DD
+  attendance: boolean[]; // 与 columns 等长、同序；true = 出席
+}
+
+export interface MeetingAttendanceMatrix {
+  columns: string[];            // 人名原文（非主键）
+  rows: MeetingAttendanceRow[]; // 保持台账原序
+  updatedAt?: string;
+}
+
+export interface MeetingAttendancePort {
+  getMatrix(): Promise<MeetingAttendanceMatrix>;
+}
+```
+
+> 该端口是**纯透传**：Service 不做任何排序、聚合与补全（ADR-0005）。个人出席率与每场出席人数由**前端**派生（02 §6.3），后端不计算。
+
+### 4.6 DI Token 与绑定切换
 
 ```ts
 // providers/tokens.ts
@@ -278,6 +307,7 @@ export const ORGANIZATION_PORT = Symbol('ORGANIZATION_PORT');
 export const CONTRIBUTION_PORT = Symbol('CONTRIBUTION_PORT');
 export const INSIGHT_PORT = Symbol('INSIGHT_PORT');
 export const SUMMIT_PORT = Symbol('SUMMIT_PORT');
+export const MEETING_ATTENDANCE_PORT = Symbol('MEETING_ATTENDANCE_PORT');
 ```
 
 ```ts
@@ -285,15 +315,16 @@ export const SUMMIT_PORT = Symbol('SUMMIT_PORT');
 @Global()
 @Module({
   providers: [
-    // ── 五个端口恒为 JSON 实现 ──────────────────
+    // ── 六个端口恒为 JSON 实现 ──────────────────
     // 采集不走端口切换：collector 写 data/*.json，API 只读本地落盘文件
     { provide: HOME_METRIC_PORT,  useClass: JsonHomeMetricProvider },
     { provide: ORGANIZATION_PORT, useClass: JsonOrganizationProvider },
     { provide: CONTRIBUTION_PORT, useClass: JsonContributionProvider },
     { provide: INSIGHT_PORT,      useClass: JsonInsightProvider },
     { provide: SUMMIT_PORT,       useClass: JsonSummitProvider },
+    { provide: MEETING_ATTENDANCE_PORT, useClass: JsonMeetingAttendanceProvider },
   ],
-  exports: [HOME_METRIC_PORT, ORGANIZATION_PORT, CONTRIBUTION_PORT, INSIGHT_PORT, SUMMIT_PORT],
+  exports: [HOME_METRIC_PORT, ORGANIZATION_PORT, CONTRIBUTION_PORT, INSIGHT_PORT, SUMMIT_PORT, MEETING_ATTENDANCE_PORT],
 })
 export class ProvidersModule {}
 ```
@@ -302,7 +333,7 @@ export class ProvidersModule {}
 >
 > **可替换性验收标准**：若"更换数据来源"需要修改 `modules/` 下任何一个文件的代码，则视为架构被破坏。按当前口径，更换数据来源（人工维护 → 采集脚本 → 定时采集）**只改变写入方，API 代码零改动**。
 
-### 4.6 Provider 实现规范
+### 4.7 Provider 实现规范
 
 - 端口方法必须是 `async`，即使 JSON 实现是同步可得的（保证接口一致，未来换成网络请求不改变签名）。
 - 适配器内部**只做数据获取与字段映射**，不抛业务异常；数据缺失返回空数组或 `null`。
@@ -345,6 +376,7 @@ export interface JsonRepository<T> {
 | `data/contributions.json` | `OrganizationContribution[]` | 低（阶段三为定时采集） | 数十条 |
 | `data/insights.json` | `OrganizationInsight[]` | 低 | 数十条 |
 | `data/summits.json` | `SummitDetail[]` | 极低 | 十余条 |
+| `data/meetings.json` | `MeetingAttendanceMatrix` | 极低（运营手动触发导入） | 1 个矩阵（约数十行 × 数十列） |
 
 > `nextSummit` 在 `home.json` 中只存 `nextSummitId` 引用，实际峰会对象由 `SummitProvider` 提供，避免同一峰会数据两处维护导致不一致。
 
@@ -429,6 +461,8 @@ export class ListSummitsQueryDto {
   upcomingOnly?: string;
 }
 ```
+
+> `GET /api/meetings` **无查询参数**（原样透传矩阵，ADR-0005），因此无需对应的 `QueryDto`。
 
 ### 6.2 统一响应信封
 
@@ -542,6 +576,7 @@ export class ListSummitsQueryDto {
 | `PORT` | 否 | `3000` | HTTP 监听端口 |
 | `NODE_ENV` | 否 | `development` | 运行环境 |
 | `DATA_DIR` | 否 | `<repo>/data` | JSON 数据目录绝对/相对路径 |
+| `MEETINGS_SOURCE_PATH` | 否 | `data/source/meetings.xlsx` | 例会台账源文件路径（**仅供采集脚本使用，API 不读取**） |
 | `CORS_ORIGINS` | 否 | `http://localhost:5173` | 允许来源，逗号分隔；同域部署可留空 |
 | `CACHE_TTL_SECONDS` | 否 | `300` | 缓存有效期 |
 | `LOG_LEVEL` | 否 | `log` | 日志级别 |
@@ -601,6 +636,7 @@ sequenceDiagram
 | Provider 适配器（JSON） | 单元测试 + 临时目录 fixture | 文件缺失、schema 版本不匹配、字段类型错误 |
 | JsonRepository | 单元测试 | 原子写是否正确替换、并发 `update` 是否丢失更新、缓存是否失效 |
 | Service | 单元测试（注入内存版 Port） | 口径计算（如 `linesChanged` 汇总）、空数据处理、日期区间过滤、排序稳定性 |
+| 例会矩阵透传 | 单元测试 | `attendance.length !== columns.length` 时抛 `DATA_CORRUPTED`；返回结果保持原序、不被加工 |
 | Controller | e2e 测试（`supertest`） | 参数校验拒绝未知字段、错误码正确、响应信封结构 |
 | 契约一致性 | 类型级校验 | Service 返回类型与 04 文档契约字段逐项对齐（Code Review 清单） |
 
@@ -621,4 +657,4 @@ sequenceDiagram
 - [ ] `ValidationPipe` 开启 `whitelist` + `forbidNonWhitelisted` + `transform`
 - [ ] JSON 写入使用临时文件 + `rename` 原子替换，且按文件串行
 - [ ] 日志中不含任何凭据与完整数据内容
-- [ ] 启动期校验 `DATA_DIR` 存在且五个 JSON 文件结构合法
+- [ ] 启动期校验 `DATA_DIR` 存在且七个 JSON 文件结构合法
