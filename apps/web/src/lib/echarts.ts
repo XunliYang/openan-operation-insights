@@ -1,12 +1,20 @@
 import * as echarts from 'echarts/core';
-import { BarChart, PieChart } from 'echarts/charts';
-import { GraphicComponent, GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
+import { BarChart, PieChart, ScatterChart } from 'echarts/charts';
+import {
+  GeoComponent,
+  GraphicComponent,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+} from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
 // 按需注册，避免把整个 echarts 打进产物
 echarts.use([
   PieChart,
   BarChart,
+  ScatterChart,
+  GeoComponent,
   GraphicComponent,
   GridComponent,
   TooltipComponent,
