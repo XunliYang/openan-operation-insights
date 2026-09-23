@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { BrandMark } from './BrandMark';
-import { IconActivity, IconCalendar, IconDashboard, IconUsers } from '@/components/icons';
+import { IconActivity, IconCalendar, IconDashboard, IconMap, IconUsers } from '@/components/icons';
 
 const NAV_ITEMS = [
   { to: '/', label: '概览', hint: '伙伴共建与关键指标', icon: <IconDashboard width={16} height={16} />, end: true },
   { to: '/activity', label: '社区活跃度', hint: '贡献与成果明细', icon: <IconActivity width={16} height={16} />, end: false },
   { to: '/summits', label: '参会情况', hint: '历次峰会与参与组织', icon: <IconCalendar width={16} height={16} />, end: false },
+  { to: '/ecosystem', label: '生态地图', hint: 'Participants 来源分布', icon: <IconMap width={16} height={16} />, end: false },
   { to: '/meetings', label: '例会出勤', hint: '例会参会矩阵', icon: <IconUsers width={16} height={16} />, end: false },
 ];
 

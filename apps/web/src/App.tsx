@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { NotFoundPage } from '@/components/layout/NotFoundPage';
 import { ActivityPage } from '@/pages/ActivityPage';
+import { EcosystemMapPage } from '@/pages/EcosystemMapPage';
 import { HomePage } from '@/pages/HomePage';
 import { MeetingsPage } from '@/pages/MeetingsPage';
 import { SummitsPage } from '@/pages/SummitsPage';
@@ -13,6 +14,7 @@ export default function App() {
         <Route index element={<HomePage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/summits" element={<SummitsPage />} />
+        <Route path="/ecosystem" element={<EcosystemMapPage />} />
         <Route path="/meetings" element={<MeetingsPage />} />
         <Route path="/404" element={<NotFoundPage />} />
         <Route path="*" element={<Navigate to="/404" replace />} />
