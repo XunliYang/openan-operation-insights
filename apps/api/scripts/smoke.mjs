@@ -17,6 +17,9 @@ const cases = [
   { name: '峰会不存在→40402', path: '/summits/not-exist', expectError: 40402 },
   { name: '非法排序字段→40001', path: '/contributions?sortBy=oops', expectError: 40001 },
   { name: '非法年份→40003', path: '/summits?year=1999', expectError: 40003 },
+  { name: '地图源列表', path: '/maps', expect: (d) => Array.isArray(d) && d.some((s) => s.sourceId === 'ecosystem-participants') },
+  { name: '地图生态源', path: '/maps/ecosystem-participants', expect: (d) => Array.isArray(d.markers) && d.markers.length >= 10 },
+  { name: '地图源不存在→40400', path: '/maps/not-exist', expectError: 40400 },
 ];
 
 let failed = 0;

@@ -6,6 +6,9 @@ import {
   Organization,
   OrganizationContribution,
   OrganizationInsight,
+  MapMarker,
+  MapSource,
+  ManualMapMarker,
 } from '../contract/entities';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -157,5 +160,55 @@ export function isHomeFileData(value: unknown): value is HomeFileData {
     isMetricValue(value.summitCount) &&
     isMetricValue(value.useCaseCount) &&
     isNullableString(value.nextSummitId)
+  );
+}
+
+const MAP_SCENARIOS = ['ecosystem', 'co-creation', 'summit'];
+const MAP_SCOPES = ['world', 'china'];
+const MARKER_ORIGINS = ['builtin', 'manual'];
+
+export function isMapMarker(value: unknown): value is MapMarker {
+  if (!isObject(value)) return false;
+  return (
+    isString(value.markerId) &&
+    isString(value.label) &&
+    isString(value.logoUrl) &&
+    (value.homepageUrl === undefined || isString(value.homepageUrl)) &&
+    isString(value.countryCode) &&
+    isString(value.countryName) &&
+    isNumber(value.longitude) &&
+    isNumber(value.latitude) &&
+    (value.locationLabel === undefined || isString(value.locationLabel)) &&
+    (value.group === undefined || isString(value.group)) &&
+    (value.orgId === undefined || value.orgId === null || isString(value.orgId)) &&
+    (value.description === undefined || isString(value.description)) &&
+    MARKER_ORIGINS.includes(String(value.origin))
+  );
+}
+
+export function isMapSource(value: unknown): value is MapSource {
+  if (!isObject(value)) return false;
+  return (
+    isString(value.sourceId) &&
+    isString(value.name) &&
+    (value.description === undefined || isString(value.description)) &&
+    MAP_SCENARIOS.includes(String(value.scenario)) &&
+    MAP_SCOPES.includes(String(value.mapScope)) &&
+    Array.isArray(value.markers) &&
+    value.markers.every(isMapMarker) &&
+    isString(value.updatedAt)
+  );
+}
+
+export function isMapSourceArray(value: unknown): value is MapSource[] {
+  return Array.isArray(value) && value.every(isMapSource);
+}
+
+/** 人工叠加层：每条在 MapMarker 基础上额外必带 sourceId: string */
+export function isManualMarkerArray(value: unknown): value is ManualMapMarker[] {
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (item): item is ManualMapMarker =>
+      isMapMarker(item) && isString((item as unknown as { sourceId?: unknown }).sourceId),
   );
 }

@@ -5,3 +5,4 @@ export const CONTRIBUTION_PORT = Symbol('CONTRIBUTION_PORT');
 export const CONTRIBUTOR_CONTRIBUTION_PORT = Symbol('CONTRIBUTOR_CONTRIBUTION_PORT');
 export const INSIGHT_PORT = Symbol('INSIGHT_PORT');
 export const SUMMIT_PORT = Symbol('SUMMIT_PORT');
+export const MAP_PORT = Symbol('MAP_PORT');
