@@ -120,3 +120,43 @@ export interface ContributionSummaryData {
   orgCount: number;
   updatedAt: string;
 }
+
+export type MapScenario = 'ecosystem' | 'co-creation' | 'summit';
+export type MapScope = 'world' | 'china';
+export type MarkerOrigin = 'builtin' | 'manual';
+
+export interface MapMarker {
+  markerId: string;
+  label: string;
+  logoUrl: string;
+  homepageUrl?: string;
+  countryCode: string;
+  countryName: string;
+  longitude: number;
+  latitude: number;
+  locationLabel?: string;
+  group?: string;
+  orgId?: string | null;
+  description?: string;
+  origin: MarkerOrigin;
+}
+
+export interface MapSource {
+  sourceId: string;
+  name: string;
+  description?: string;
+  scenario: MapScenario;
+  mapScope: MapScope;
+  markers: MapMarker[];
+  updatedAt: string;
+}
+
+export interface MapSourceSummary {
+  sourceId: string;
+  name: string;
+  description?: string;
+  scenario: MapScenario;
+  mapScope: MapScope;
+  markerCount: number;
+  updatedAt: string;
+}

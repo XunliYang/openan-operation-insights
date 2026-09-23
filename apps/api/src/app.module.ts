@@ -4,6 +4,7 @@ import { ActivityModule } from './modules/activity/activity.module';
 import { HomeModule } from './modules/home/home.module';
 import { SummitModule } from './modules/summit/summit.module';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { MapModule } from './modules/map/map.module';
 import { CommonModule } from './common/common.module';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
@@ -26,6 +27,7 @@ import { RepositoriesModule } from './repositories/repositories.module';
     OrganizationModule,
     ActivityModule,
     SummitModule,
+    MapModule,
   ],
 })
 export class AppModule {}

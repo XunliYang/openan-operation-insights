@@ -18,6 +18,10 @@ export interface JsonRepositoryOptions<T> {
   schemaVersion: number;
   /** 结构校验守卫；失败即视为数据损坏 */
   isValidData: (value: unknown) => value is T;
+  /** 可选文件：文件缺失或 JSON 解析失败时不置 degraded、不抛错，read() 返回空信封（data=[]） */
+  optional?: boolean;
+  /** 缓存 TTL（毫秒）；默认 0 = 永久内存缓存不变；>0 时过期后重新落盘读取 */
+  cacheTtlMs?: number;
 }
 
 /**
@@ -31,6 +35,8 @@ export class JsonRepository<T> {
   private readonly filePath: string;
   private readonly options: JsonRepositoryOptions<T>;
   private cache: JsonFileEnvelope<T> | null = null;
+  /** 缓存写入时间（ms），供 cacheTtlMs 判定过期 */
+  private cacheLoadedAt = 0;
   /** 每条记录一条写链，保证同一文件的写入串行 */
   private writeChain: Promise<unknown> = Promise.resolve();
   private degraded = false;
@@ -52,11 +58,16 @@ export class JsonRepository<T> {
 
   async read(): Promise<JsonFileEnvelope<T>> {
     if (this.cache) {
-      return structuredClone(this.cache);
+      const ttl = this.options.cacheTtlMs ?? 0;
+      // ttl <= 0 保持现有永久内存缓存；ttl > 0 时过期后重新落盘读取
+      if (ttl <= 0 || Date.now() - this.cacheLoadedAt < ttl) {
+        return structuredClone(this.cache);
+      }
     }
 
     const envelope = await this.readFromDisk();
     this.cache = envelope;
+    this.cacheLoadedAt = Date.now();
     return structuredClone(envelope);
   }
 
@@ -69,6 +80,7 @@ export class JsonRepository<T> {
       };
       await this.writeToDisk(envelope);
       this.cache = envelope;
+      this.cacheLoadedAt = Date.now();
       this.degraded = false;
     });
   }
@@ -84,12 +96,14 @@ export class JsonRepository<T> {
       };
       await this.writeToDisk(envelope);
       this.cache = envelope;
+      this.cacheLoadedAt = Date.now();
       this.degraded = false;
     });
   }
 
   invalidate(): void {
     this.cache = null;
+    this.cacheLoadedAt = 0;
   }
 
   /** 把任务追加到写链尾部，前序任务结束后才执行 */
@@ -103,8 +117,22 @@ export class JsonRepository<T> {
     return run;
   }
 
+  /** 可选文件缺失/解析失败时的空信封（不置 degraded） */
+  private emptyEnvelope(): JsonFileEnvelope<T> {
+    this.degraded = false;
+    return {
+      schemaVersion: this.options.schemaVersion,
+      updatedAt: new Date().toISOString(),
+      data: [] as unknown as T,
+    };
+  }
+
   private async readFromDisk(): Promise<JsonFileEnvelope<T>> {
     if (!existsSync(this.filePath)) {
+      if (this.options.optional) {
+        this.logger.debug(`可选数据文件缺失，视为空数据：${this.options.fileName}`);
+        return this.emptyEnvelope();
+      }
       this.degraded = true;
       throw new DomainException(
         ErrorCode.DATA_CORRUPTED,
@@ -125,6 +153,10 @@ export class JsonRepository<T> {
     try {
       parsed = JSON.parse(raw);
     } catch (error) {
+      if (this.options.optional) {
+        this.logger.debug(`可选数据文件 JSON 解析失败，视为空数据：${this.options.fileName}`);
+        return this.emptyEnvelope();
+      }
       this.degraded = true;
       this.logger.error(`${this.options.fileName} JSON 解析失败：${(error as Error).message}`);
       throw new DomainException(ErrorCode.DATA_CORRUPTED, `数据文件不是合法 JSON：${this.options.fileName}`);

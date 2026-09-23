@@ -5,6 +5,7 @@ import { JsonHomeMetricProvider } from './json/json-home-metric.provider';
 import { JsonInsightProvider } from './json/json-insight.provider';
 import { JsonSummitProvider } from './json/json-summit.provider';
 import { JsonOrganizationProvider } from './json/json-organization.provider';
+import { JsonMapProvider } from './json/json-map.provider';
 import {
   CONTRIBUTION_PORT,
   CONTRIBUTOR_CONTRIBUTION_PORT,
@@ -12,6 +13,7 @@ import {
   INSIGHT_PORT,
   SUMMIT_PORT,
   ORGANIZATION_PORT,
+  MAP_PORT,
 } from './tokens';
 
 /**
@@ -34,6 +36,7 @@ import {
     { provide: CONTRIBUTOR_CONTRIBUTION_PORT, useClass: JsonContributorContributionProvider },
     { provide: INSIGHT_PORT, useClass: JsonInsightProvider },
     { provide: SUMMIT_PORT, useClass: JsonSummitProvider },
+    { provide: MAP_PORT, useClass: JsonMapProvider },
   ],
   exports: [
     HOME_METRIC_PORT,
@@ -42,6 +45,7 @@ import {
     CONTRIBUTOR_CONTRIBUTION_PORT,
     INSIGHT_PORT,
     SUMMIT_PORT,
+    MAP_PORT,
   ],
 })
 export class ProvidersModule {}

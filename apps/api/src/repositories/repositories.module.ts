@@ -8,6 +8,8 @@ import {
   Organization,
   OrganizationContribution,
   OrganizationInsight,
+  MapSource,
+  ManualMapMarker,
 } from '../contract/entities';
 import { JsonRepository } from './json-repository';
 import {
@@ -17,6 +19,8 @@ import {
   INSIGHTS_REPOSITORY,
   SUMMITS_REPOSITORY,
   ORGANIZATIONS_REPOSITORY,
+  MAP_SOURCES_REPOSITORY,
+  MAP_SOURCES_MANUAL_REPOSITORY,
 } from './repository.tokens';
 import {
   isContributionArray,
@@ -25,6 +29,8 @@ import {
   isInsightArray,
   isSummitDetailArray,
   isOrganizationArray,
+  isMapSourceArray,
+  isManualMarkerArray,
 } from './validators';
 
 type RepositoryFactory<T> = (
@@ -34,12 +40,15 @@ type RepositoryFactory<T> = (
 function makeRepository<T>(
   fileName: string,
   isValidData: (value: unknown) => value is T,
+  extra?: { optional?: boolean; cacheTtlMs?: number },
 ): RepositoryFactory<T> {
   return (config: ConfigService) =>
     new JsonRepository<T>(join(config.getOrThrow<string>('dataDir'), fileName), {
       fileName,
       schemaVersion: 1,
       isValidData,
+      optional: extra?.optional,
+      cacheTtlMs: extra?.cacheTtlMs,
     });
 }
 
@@ -77,6 +86,20 @@ const repositoryProviders = [
     useFactory: makeRepository<SummitDetail[]>('summits.json', isSummitDetailArray),
     inject: [ConfigService],
   },
+  {
+    provide: MAP_SOURCES_REPOSITORY,
+    useFactory: makeRepository<MapSource[]>('map-sources.json', isMapSourceArray),
+    inject: [ConfigService],
+  },
+  {
+    provide: MAP_SOURCES_MANUAL_REPOSITORY,
+    useFactory: makeRepository<ManualMapMarker[]>(
+      'map-sources.manual.json',
+      isManualMarkerArray,
+      { optional: true, cacheTtlMs: 15000 },
+    ),
+    inject: [ConfigService],
+  },
 ];
 
 /**
@@ -94,6 +117,9 @@ export class DataBootstrapService implements OnApplicationBootstrap {
     @Inject(INSIGHTS_REPOSITORY) private readonly insights: JsonRepository<OrganizationInsight[]>,
     @Inject(CONTRIBUTORS_REPOSITORY) private readonly contributors: JsonRepository<Contributor[]>,
     @Inject(SUMMITS_REPOSITORY) private readonly summits: JsonRepository<SummitDetail[]>,
+    @Inject(MAP_SOURCES_REPOSITORY) private readonly mapSources: JsonRepository<MapSource[]>,
+    @Inject(MAP_SOURCES_MANUAL_REPOSITORY)
+    private readonly mapSourcesManual: JsonRepository<ManualMapMarker[]>,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -104,6 +130,8 @@ export class DataBootstrapService implements OnApplicationBootstrap {
       this.insights,
       this.contributors,
       this.summits,
+      this.mapSources,
+      this.mapSourcesManual,
     ] as const;
 
     const results = await Promise.all(
@@ -137,6 +165,8 @@ export class DataBootstrapService implements OnApplicationBootstrap {
     INSIGHTS_REPOSITORY,
     CONTRIBUTORS_REPOSITORY,
     SUMMITS_REPOSITORY,
+    MAP_SOURCES_REPOSITORY,
+    MAP_SOURCES_MANUAL_REPOSITORY,
   ],
 })
 export class RepositoriesModule {}
