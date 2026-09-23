@@ -5,9 +5,15 @@ import { Card } from '@/components/ui/Card';
 import { ActivityFilters, type ActivityFilterState } from '@/features/activity/ActivityFilters';
 import { ActivityTable } from '@/features/activity/ActivityTable';
 import { ContributionCompositionCard } from '@/features/activity/ContributionCompositionCard';
-import { ContributionRankCard } from '@/features/activity/ContributionRankCard';
+import { ContributorRankCard } from '@/features/activity/ContributorRankCard';
 import { mergeActivityRows } from '@/features/activity/merge';
-import { useContributions, useContributionSummary, useInsights, useOrganizationOptions } from '@/hooks/useActivity';
+import {
+  useContributions,
+  useContributionSummary,
+  useContributorContributions,
+  useInsights,
+  useOrganizationOptions,
+} from '@/hooks/useActivity';
 import { fromDateInput, formatDateTime } from '@/lib/format';
 
 const DEFAULT_FILTERS: ActivityFilterState = {
@@ -35,6 +41,7 @@ export function ActivityPage() {
   const contributions = useContributions(params);
   const insights = useInsights(params);
   const summary = useContributionSummary(params);
+  const contributorContributions = useContributorContributions(params);
   const organizationOptions = useOrganizationOptions();
 
   /** 明细表底表：全量组织档案，随 orgIds 筛选收窄（ADR-0002） */
@@ -50,7 +57,11 @@ export function ActivityPage() {
   );
 
   const isFetching =
-    contributions.isFetching || insights.isFetching || summary.isFetching || organizationOptions.isFetching;
+    contributions.isFetching ||
+    insights.isFetching ||
+    summary.isFetching ||
+    contributorContributions.isFetching ||
+    organizationOptions.isFetching;
   const isLoading =
     contributions.isLoading || insights.isLoading || organizationOptions.isLoading;
 
@@ -103,15 +114,14 @@ export function ActivityPage() {
           />
         </div>
         <div className="xl:col-span-3">
-          <ContributionRankCard
-            rows={rows}
-            isLoading={isLoading}
-            isError={contributions.isError && insights.isError}
-            error={contributions.error ?? insights.error}
-            onRetry={() => {
-              void contributions.refetch();
-              void insights.refetch();
-            }}
+          <ContributorRankCard
+            contributors={contributorContributions.data}
+            organizations={organizationOptions.data ?? []}
+            isLoading={contributorContributions.isLoading}
+            isError={contributorContributions.isError}
+            error={contributorContributions.error}
+            onRetry={() => void contributorContributions.refetch()}
+            updatedAt={summary.data?.updatedAt}
           />
         </div>
       </div>

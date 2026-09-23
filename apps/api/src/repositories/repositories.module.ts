@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   Contributor,
   HomeFileData,
+  MeetingAttendanceMatrix,
   SummitDetail,
   Organization,
   OrganizationContribution,
@@ -17,6 +18,7 @@ import {
   CONTRIBUTORS_REPOSITORY,
   HOME_REPOSITORY,
   INSIGHTS_REPOSITORY,
+  MEETINGS_REPOSITORY,
   SUMMITS_REPOSITORY,
   ORGANIZATIONS_REPOSITORY,
   MAP_SOURCES_REPOSITORY,
@@ -27,6 +29,7 @@ import {
   isContributorArray,
   isHomeFileData,
   isInsightArray,
+  isMeetingAttendanceMatrix,
   isSummitDetailArray,
   isOrganizationArray,
   isMapSourceArray,
@@ -100,10 +103,18 @@ const repositoryProviders = [
     ),
     inject: [ConfigService],
   },
+  {
+    provide: MEETINGS_REPOSITORY,
+    useFactory: makeRepository<MeetingAttendanceMatrix>(
+      'meetings.json',
+      isMeetingAttendanceMatrix,
+    ),
+    inject: [ConfigService],
+  },
 ];
 
 /**
- * 启动期数据自检：校验五个业务 JSON 文件的结构合法性。
+ * 启动期数据自检：校验九个业务 JSON 文件的结构合法性。
  * 校验失败不阻断启动（降级只读），由具体接口返回 50001。
  */
 export class DataBootstrapService implements OnApplicationBootstrap {
@@ -120,6 +131,8 @@ export class DataBootstrapService implements OnApplicationBootstrap {
     @Inject(MAP_SOURCES_REPOSITORY) private readonly mapSources: JsonRepository<MapSource[]>,
     @Inject(MAP_SOURCES_MANUAL_REPOSITORY)
     private readonly mapSourcesManual: JsonRepository<ManualMapMarker[]>,
+    @Inject(MEETINGS_REPOSITORY)
+    private readonly meetings: JsonRepository<MeetingAttendanceMatrix>,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -132,6 +145,7 @@ export class DataBootstrapService implements OnApplicationBootstrap {
       this.summits,
       this.mapSources,
       this.mapSourcesManual,
+      this.meetings,
     ] as const;
 
     const results = await Promise.all(
@@ -167,6 +181,7 @@ export class DataBootstrapService implements OnApplicationBootstrap {
     SUMMITS_REPOSITORY,
     MAP_SOURCES_REPOSITORY,
     MAP_SOURCES_MANUAL_REPOSITORY,
+    MEETINGS_REPOSITORY,
   ],
 })
 export class RepositoriesModule {}

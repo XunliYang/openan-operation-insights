@@ -3,6 +3,7 @@ import { apiGet } from '@/lib/api-client';
 import { queryKeys, type ActivityParams } from './query-keys';
 import type {
   ContributionSummaryData,
+  ContributorContribution,
   Organization,
   OrganizationContribution,
   OrganizationInsight,
@@ -36,6 +37,19 @@ export function useInsights(params: ActivityParams = {}) {
     queryFn: ({ signal }) =>
       apiGet<OrganizationInsight[]>('/insights', {
         params: { ...toParams(params), sortBy: 'requirements', order: 'desc' },
+        signal,
+      }),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** 个人维度 GitHub 贡献榜：仅返回带采集指标的个人（含独立开发者，见 04 文档 5.3.8） */
+export function useContributorContributions(params: ActivityParams = {}) {
+  return useQuery({
+    queryKey: queryKeys.contributorContributions(params),
+    queryFn: ({ signal }) =>
+      apiGet<ContributorContribution[]>('/contributor-contributions', {
+        params: { ...toParams(params), sortBy: 'commits', order: 'desc' },
         signal,
       }),
     placeholderData: (previous) => previous,

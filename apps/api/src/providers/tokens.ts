@@ -6,3 +6,4 @@ export const CONTRIBUTOR_CONTRIBUTION_PORT = Symbol('CONTRIBUTOR_CONTRIBUTION_PO
 export const INSIGHT_PORT = Symbol('INSIGHT_PORT');
 export const SUMMIT_PORT = Symbol('SUMMIT_PORT');
 export const MAP_PORT = Symbol('MAP_PORT');
+export const MEETING_ATTENDANCE_PORT = Symbol('MEETING_ATTENDANCE_PORT');

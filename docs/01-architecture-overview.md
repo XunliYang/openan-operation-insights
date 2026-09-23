@@ -43,13 +43,14 @@ OpenAN 是一个开放协作社区，其运营工作长期面临信息分散的�
 - 各成员单位对社区的贡献（PR、Issue、代码量、需求、最佳实践）缺少统一口径的汇总视图；
 - 历次峰会信息（时间、地点、官网、参会组织）缺少可检索、可追溯的沉淀载体。
 
-本平台将这些信息集中到一个**后台看板式网站**中，供社区运营团队与成员单位查看。网站结构极其简单——顶部导航栏 + 内容区，三个一级页面：
+本平台将这些信息集中到一个**后台看板式网站**中，供社区运营团队与成员单位查看。网站结构极其简单——顶部导航栏 + 内容区，四个一级页面：
 
 | 页面 | 路由 | 核心价值 |
 | --- | --- | --- |
 | 首页 | `/` | 一屏看清社区整体规模与最近动态 |
 | 社区活跃度情况 | `/activity` | 按组织维度对比贡献度 |
 | 参会情况 | `/summits` | 时间线回顾历次峰会并查看明细 |
+| 例会参会情况 | `/meetings` | 例会出席矩阵（人 × 日期） |
 
 ---
 
@@ -83,6 +84,11 @@ mindmap
         参会组织
         参会人数
         议程与成果
+    例会参会情况
+      参会矩阵（人 × 日期）
+        出席 / 缺席
+        个人出席率
+      当次出席人数
 ```
 
 ---
@@ -166,7 +172,7 @@ flowchart TB
 | 前端框架 | React | 18.x | 用户指定；生态成熟，图表/表格/时间线组件丰富 |
 | 前端语言 | TypeScript | 5.x | 强类型贯穿前后端，契约可用类型表达 |
 | 前端构建 | Vite | 5.x | 冷启动快，HMR 体验好，构建产物为纯静态资源 |
-| 前端路由 | React Router | 6.x | 三个一级路由 + 可选详情路由，支持 `NavLink` 高亮 |
+| 前端路由 | React Router | 6.x | 四个一级路由 + 可选详情路由，支持 `NavLink` 高亮 |
 | 前端数据获取 | TanStack Query (React Query) | 5.x | 统一缓存、去重、失效、重试与加载/错误态，避免手写 useEffect 数据流 |
 | 前端样式 | Tailwind CSS + tailwind-merge + tailwindcss-animate | 3.4.17 | 原子化样式，便于统一卡片/表格/时间线视觉语言 |
 | 前端组件 | shadcn/ui 风格本地组件 | — | 组件源码内置于仓库，可完全掌控视觉细节 |
@@ -281,7 +287,7 @@ flowchart TB
 
 ### 7.5 原则五：不过度抽象
 
-三个页面、五个数据文件、两个预留数据源——这是一个**小系统**。架构上只引入必要的抽象（Provider 端口、Repository），不引入 DDD 聚合根、CQRS、事件总线等重型范式。
+四个页面、七个数据文件、两个预留数据源——这是一个**小系统**。架构上只引入必要的抽象（Provider 端口、Repository），不引入 DDD 聚合根、CQRS、事件总线等重型范式。
 
 ---
 
@@ -346,7 +352,7 @@ flowchart LR
 | Provider 适配器 | `来源 + 业务 + Provider` | `JsonContributionProvider`、`JsonSummitProvider` |
 | DI Token | 大写下划线常量 | `CONTRIBUTION_PORT` |
 | DTO | PascalCase + `Dto` 后缀 | `GetContributionsQueryDto` |
-| JSON 数据文件 | 全小写，单数名词 | `home.json`、`organizations.json` |
+| JSON 数据文件 | 全小写，单数名词 | `home.json`、`organizations.json`、`meetings.json` |
 | API 路径 | 全小写，复数资源名 | `/api/summits`、`/api/organizations` |
 | 时间字段 | ISO 8601 字符串，UTC | `"2026-09-18T09:00:00Z"` |
 | 布尔字段 | `is` / `has` 前缀 | `isUpcoming`、`hasDetail` |
@@ -366,12 +372,15 @@ openan-operation-insights/
 │   └── 05-integration-roadmap.md
 │
 ├── data/                                  # JSON 种子数据（运行时被后端读取）
+│   ├── source/                            # 人工维护的源台账（采集器输入，非契约文件）
+│   │   └── meetings.xlsx                  # 例会参会台账（运营手工更新）
 │   ├── home.json                          # 首页指标 + 下一次峰会
 │   ├── organizations.json                 # 组织档案（伙伴 / 外部开发者）
 │   ├── contributions.json                 # 组织 × 贡献指标（GitHub 类）
 │   ├── insights.json                      # 组织 × Confluence 类指标
 │   ├── contributors.json                  # 个人贡献者档案（GitHub 账号维度）
-│   └── summits.json                      # 峰会列表 + 详情
+│   ├── summits.json                       # 峰会列表 + 详情
+│   └── meetings.json                      # 例会参会矩阵（人 × 日期）
 │
 ├── apps/
 │   ├── web/                               # React 18 + TS + Vite
@@ -381,7 +390,7 @@ openan-operation-insights/
 │   │       ├── main.tsx
 │   │       ├── App.tsx                    # 路由表
 │   │       ├── layouts/AppLayout.tsx      # Navbar + <Outlet/> + Footer
-│   │       ├── pages/                     # HomePage / ActivityPage / SummitsPage
+│   │       ├── pages/                     # HomePage / ActivityPage / SummitsPage / MeetingsPage
 │   │       ├── sections/                  # 页面内区块（一区块一文件）
 │   │       ├── components/ui/             # Button / Card / Table / Badge / Skeleton …
 │   │       ├── features/                  # 按业务域的 hooks + api 封装
@@ -395,12 +404,14 @@ openan-operation-insights/
 │       │   ├── modules/
 │       │   │   ├── home/                  # home.module / controller / service
 │       │   │   ├── activity/
-│       │   │   └── summit/
+│       │   │   ├── summit/
+│       │   │   └── meeting/               # 例会参会矩阵
 │       │   ├── providers/                 # ★ 端口接口 + 适配器实现
 │       │   │   ├── ports/                 # contribution.port.ts 等纯接口
 │       │   │   ├── json/                  # json-*.provider.ts（唯一实现）
 │       │   │   └── providers.module.ts    # 端口 → 适配器绑定
 │       │   ├── collector/                 # ★ 采集器（独立上下文，写 data/*.json）
+│       │   ├── scripts/                   # 采集脚本（import-meetings.ts：xlsx → meetings.json）
 │       │   ├── repositories/              # JsonRepository（原子写 + 串行队列）
 │       │   ├── common/                    # 响应包装 / 异常过滤器 / 错误码
 │       │   └── config/                    # 配置加载与校验
@@ -442,6 +453,7 @@ openan-operation-insights/
 | GitHub API 限流（5000 req/h） | 采集失败 | 中 | ETag 条件请求 + 增量拉取 + TTL 缓存 + GraphQL 批量查询（见 05 文档） |
 | 数据文件未持久化导致更新丢失 | 数据回退 | 中 | 部署时强制挂载持久化卷 + 纳入备份 |
 | 页面数据量增长后前端卡顿 | 体验下降 | 低 | 表格虚拟滚动、图表数据 `useMemo` 派生、分页接口预留 |
+| 例会矩阵无人事主键（列名即人名，ADR-0005） | 改名/重名/空格差异产生重复列，出席率静默算错；接入 Zoom 需从零重建映射 | 中 | 台账侧人工保证列名一致；ADR-0005 标记为已知负债；接入 Zoom 前先补 `personId` |
 
 ---
 

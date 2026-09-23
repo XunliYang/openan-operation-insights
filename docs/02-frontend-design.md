@@ -32,11 +32,12 @@
 | 路径 | 页面组件 | 导航名称 | 说明 |
 | --- | --- | --- | --- |
 | `/` | `HomePage` | 首页 | 指标卡 + 贡献组织 + 下一次峰会横幅 |
-| `/activity` | `ActivityPage` | 社区活跃度情况 | 贡献排行 + 组织贡献分布 + 明细表 |
+| `/activity` | `ActivityPage` | 社区活跃度情况 | 个人贡献排行 + 组织贡献分布 + 明细表 |
 | `/summits` | `SummitsPage` | 参会情况 | 时间线 + 峰会详情表格 |
+| `/meetings` | `MeetingsPage` | 例会参会情况 | 例会参会矩阵（人 × 日期） |
 | `*` | `NotFoundPage` | — | 兜底 404，提供返回首页入口 |
 
-**路由级懒加载**：三个页面均为独立 chunk，通过 `React.lazy` + `Suspense` 加载，首屏只加载首页代码。
+**路由级懒加载**：四个页面均为独立 chunk，通过 `React.lazy` + `Suspense` 加载，首屏只加载首页代码。
 
 **可选扩展（预留，本期不实现）**：`/activity?org=<orgId>` 下钻单个组织、`/summits/:summitId` 峰会详情独立页。
 
@@ -50,6 +51,7 @@ Routes 结构示意（实现时以此为准）：
       <Route index element={<HomePage />} />
       <Route path="activity" element={<ActivityPage />} />
       <Route path="summits" element={<SummitsPage />} />
+      <Route path="meetings" element={<MeetingsPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Route>
   </Routes>
@@ -111,17 +113,18 @@ Routes 结构示意（实现时以此为准）：
 | # | 区块 | 组件 | 说明 |
 | --- | --- | --- | --- |
 | 1 | 筛选概览栏 | `ActivityFilterBar` | 时间范围下拉（近 30 天 / 近 90 天 / 近 1 年 / 全部）、组织多选、重置、导出按钮 |
-| 2 | 贡献排行榜 | `ContributionRankChart` | 横向条形图，可切换指标维度 |
+| 2 | 个人贡献排行 | `ContributorRankCard` | 头像列表 + 指标切换（合并 PR / 提交数 / Issue / 代码行数），默认按提交数取 Top 8（ADR-0004） |
 | 3 | 组织贡献分布 | `ContributionCompositionCard` | 环形图，按提交数统计各组织占比，低占比并入「其他」，中心显示提交总量（ADR-0003） |
 | 4 | 贡献明细表格 | `ContributionDetailTable` | 组织 × 指标矩阵，**全量组织**各占一行，表头排序 |
 | 5 | 页脚 | `AppFooter` | 数据更新时间 |
 
 ### 4.2 字段清单
 
-**排行榜 / 明细表共用同一份行数据**（前端按 `orgId` 合并三源：`GET /api/organizations` 组织档案 + `GET /api/contributions` + `GET /api/insights`）：
+**明细表与组织贡献分布共用同一份行数据**（前端按 `orgId` 合并三源：`GET /api/organizations` 组织档案 + `GET /api/contributions` + `GET /api/insights`）；**个人贡献排行走独立接口** `GET /api/contributor-contributions`（ADR-0004）：
 
 - **明细表**：以组织档案为**底表**，全量组织各占一行；无贡献记录的指标按 0 展示、更新时间与仓库数显示"—"，名称 / Logo / 官网以档案为准（ADR-0002）。档案接口失败时退回两源合并结果。
-- **排行榜**：在行数据上按当前指标过滤 `> 0` 后取 Top N，零值组织不进入图表。
+- **组织贡献分布**：在行数据上按 `github.commits` 计算各组织占比（口径见本节末段，ADR-0003）。
+- **个人贡献排行**：在接口返回的个人数据上按当前指标过滤 `> 0`、降序取 Top 8，零值个人不进入榜单。
 
 
 | 列 | 字段 | 类型 | 可排序 | 备注 |
@@ -134,9 +137,11 @@ Routes 结构示意（实现时以此为准）：
 | best-practice 案例 | `confluence.bestPractices` | number | ✅ | Confluence 来源 |
 | 更新时间 | `updatedAt` | ISO 8601 | ✅ | 相对时间展示 |
 
-**排行榜维度切换**：`pr` / `issue` / `lines` / `requirement` / `bestPractice`，切换时条形图 300ms 过渡动画，取 Top N（默认 10，可切全部）。
+**个人排行指标切换**：`pullRequests` / `commits` / `issues` / `linesChanged` 四个维度（默认「提交数」，与接口默认排序一致），切换时占比条 700ms 缓动过渡，固定取 Top 8（前端切片，不传接口 `limit`，避免与页面筛选参数形成第二套口径）。
 
 **环形图口径**（ADR-0003）：按组织维度统计 `github.commits` 提交数占比，数据复用 `GET /api/contributions`；占比低于 3% 或超出 6 个具名扇区上限的组织并入「其他」扇区（中性灰着色），头部组织始终保留具名扇区，中心显示提交总量。
+
+**个人排行口径**（ADR-0004）：数据源 `GET /api/contributor-contributions`，仅包含采集到贡献记录的个人（人工维护但无贡献记录的档案不出现）；`orgId` 为空的独立开发者显示为「独立开发者」标签（伪组织 `unattributed`，可被组织筛选单独命中）；组织名由 `GET /api/organizations` 的 `orgId → name` 映射解析；头像取 `avatarUrl`，缺失或加载失败时降级为姓名首字母色块。阶段一时间区间筛选对该接口不生效，卡片底部给出同口径提示与数据更新时间。
 
 ### 4.3 交互细节
 
@@ -144,6 +149,8 @@ Routes 结构示意（实现时以此为准）：
 - 表格列排序为**前端排序**（数据量小），点击表头切换 `asc → desc → 无` 三态，排序图标使用 `lucide-react` 的 `ArrowUpDown` / `ArrowUp` / `ArrowDown`。
 - 小屏（<768px）时表格转为卡片列表，每个组织一张卡，指标以键值对展示。
 - 导出按钮本期调用 `console` 级别的占位实现（在 UI 上标注"即将支持"），后续接后端导出接口。
+- 个人排行卡使用**独立**的 `isLoading` / `isError` / `onRetry`：个人接口失败只在卡内提示并可单独重试，不阻塞同页环形图与明细表（延续 3.3 的区块级错误约定）。
+- 个人排行头像为 `<img loading="lazy">`，`avatarUrl` 缺失或触发 `onError` 时切换为首字母色块；占比条宽度随指标切换做 700ms 缓动，并在系统「减少动态效果」偏好下取消过渡。
 
 ---
 
@@ -211,20 +218,65 @@ Routes 结构示意（实现时以此为准）：
 
 ---
 
-## 6. 组件清单与复用关系
+## 6. 例会参会情况页（`/meetings`）设计
 
-### 6.1 组件树
+> 依据 ADR-0005：例会是**独立实体**，与峰会完全解耦；数据为「人（横）× 日期（竖）」二维矩阵，直接照搬 Excel 台账——**保留原序、不可重排、不含任何会议元信息**。
+
+### 6.1 页面结构
+
+| # | 区块 | 组件 | 数据来源 |
+| --- | --- | --- | --- |
+| 1 | 标题 + 口径说明 | `MeetingAttendanceHeader` | 静态文案（含「空白亦计入缺席」提示） |
+| 2 | 参会矩阵 | `MeetingAttendanceMatrix` → `AttendanceCell ×N` | `GET /api/meetings` |
+| 3 | 页脚 | `AppFooter` | 数据更新时间 |
+
+```text
+┌─ 口径说明：空白格代表缺席；未加入前的空白同样计入缺席 ──────────┐
+├─ 参会矩阵（行 = 日期，列 = 人名；列头附个人出席率）────────────┤
+│  日期        │ 张三 85% │ 李四 62% │ 王五 100% │ …          │
+│  2026-09-18  │ ✓ (3)    │ ✓        │ ✓         │            │
+│  2026-09-11  │ ✓        │ —        │ ✓         │            │
+│  …（Sticky 表头 + Sticky 首列，纵向 / 横向滚动）                │
+└───────────────────────────────────────────────────────────────┘
+```
+
+### 6.2 字段清单
+
+| 位置 | 字段 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| 列头主标签 | `columns[i]` | string | Excel 表头原文（人名），**原序直出** |
+| 列头副标签 | 派生个人出席率 | string | `present / rows.length`，前端计算（见 6.3） |
+| 行头主标签 | `rows[j].date` | string | `YYYY-MM-DD` |
+| 行头副标签 | 派生当次出席人数 | number | `rows[j].attendance` 中 `true` 的计数 |
+| 单元格 | `rows[j].attendance[i]` | boolean | `true` → ✓，`false` → — |
+| 页脚 | `updatedAt` | ISO 8601 | 数据更新时间 |
+
+### 6.3 口径与交互细节
+
+- **顺序固定**：矩阵严格按接口返回的 `columns` / `rows` 原序渲染，**不提供任何排序交互**（ADR-0005）。
+- **出席率**：`present / rows.length`，由前端在列头副标签内计算，接口不返回派生值；因「空白 = 缺席」会把后加入者的早期空白计入分母，页面顶部**必须**常驻口径说明。
+- **每场出席人数**：取该行 `attendance` 中 `true` 的计数，作为行头副标签。
+- **滚动**：规模为数十场 × 数十人，使用普通 `<table>`；`thead` 设 `sticky top-0`，首列（日期）设 `sticky left-0` 且背景不透明，避免横向滚动透视（延续 10.2 的做法）。
+- **状态**：`rows.length === 0` 渲染 `EmptyState`；接口失败渲染 `ErrorState` + 重试；刷新中保留旧矩阵（延续 8.4）。
+- **不做筛选与导出**：本期不含时间范围筛选、组织筛选与导出，与「照搬台账」的极简定位一致。
+
+---
+
+## 7. 组件清单与复用关系
+
+### 7.1 组件树
 
 ```mermaid
 flowchart TB
   A["App"] --> B["AppLayout"]
-  B --> N["Navbar<br/>（吸顶，含 NavLink ×3、主题切换）"]
+  B --> N["Navbar<br/>（吸顶，含 NavLink ×4、主题切换）"]
   B --> O["Outlet（路由出口）"]
   B --> F["AppFooter<br/>（版权 + 数据更新时间）"]
 
   O --> P1["HomePage"]
   O --> P2["ActivityPage"]
   O --> P3["SummitsPage"]
+  O --> P4["MeetingsPage"]
 
   P1 --> S11["HomeMetricSection"] --> C1["MetricCard ×5"]
   P1 --> S12["HomeOrganizationsSection"] --> C2["OrganizationCard ×N"]
@@ -238,9 +290,12 @@ flowchart TB
   P3 --> S31["SummitAnchorBar"]
   P3 --> S32["SummitTimeline"] --> C3["SummitCard ×N"]
   P3 --> S33["SummitDetailTables"] --> C4["SummitDetailTable ×N"]
+
+  P4 --> S41["MeetingAttendanceHeader"]
+  P4 --> S42["MeetingAttendanceMatrix"] --> C5["AttendanceCell ×N"]
 ```
 
-### 6.2 基础 UI 组件（`components/ui/`）
+### 7.2 基础 UI 组件（`components/ui/`）
 
 | 组件 | 用途 | 关键 props |
 | --- | --- | --- |
@@ -255,7 +310,7 @@ flowchart TB
 | `SectionHeader` | 区块标题 | `title`、`description?`、`action?` |
 | `ExternalLink` | 统一样式的外链 | `href`、`children` |
 
-### 6.3 复用原则
+### 7.3 复用原则
 
 - 页面组件只做"**编排**"：不写样式细节，只负责组合 section 与传递数据。
 - 区块组件负责"**一个业务区块**"的渲染与局部状态（如排序、维度切换）。
@@ -264,9 +319,9 @@ flowchart TB
 
 ---
 
-## 7. 数据获取与状态管理
+## 8. 数据获取与状态管理
 
-### 7.1 分层约定
+### 8.1 分层约定
 
 ```text
 组件 → useXxxQuery()（features/*.hooks.ts） → xxxApi()（features/*.api.ts） → apiClient（lib/http.ts）
@@ -276,7 +331,7 @@ flowchart TB
 - `apiClient` 负责：注入 `baseURL`、统一解包 `{ code, message, data }`、将非 0 `code` 转成异常、统一错误消息提取。
 - hook 负责：声明 `queryKey`、`staleTime`、`select`（数据裁剪/派生）。
 
-### 7.2 API 端点与 hook 映射
+### 8.2 API 端点与 hook 映射
 
 | Hook | 方法 | 端点 | queryKey |
 | --- | --- | --- | --- |
@@ -285,8 +340,9 @@ flowchart TB
 | `useContributions(params)` | GET | `/api/contributions` | `['contributions', { from, to, orgIds }]` |
 | `useContributionInsights(params)` | GET | `/api/insights` | `['insights', { from, to, orgIds }]` |
 | `useSummits(params?)` | GET | `/api/summits` | `['summits', { year, includeDetail }]` |
+| `useMeetingAttendance()` | GET | `/api/meetings` | `['meetings']` |
 
-### 7.3 queryKey 与缓存策略
+### 8.3 queryKey 与缓存策略
 
 | 数据类型 | `staleTime` | `gcTime` | 理由 |
 | --- | --- | --- | --- |
@@ -294,10 +350,11 @@ flowchart TB
 | 组织列表 | 30 min | 60 min | 极低频变更 |
 | 贡献 / 洞察 | 5 min | 30 min | 会随筛选参数变化 |
 | 峰会列表 | 30 min | 60 min | 极低频变更 |
+| 例会参会矩阵 | 30 min | 60 min | 极低频变更（台账手工更新） |
 
 **全局默认值**（`QueryClient`）：`retry: 2`（指数退避，间隔 1s/2s）、`refetchOnWindowFocus: false`、`refetchOnReconnect: true`。
 
-### 7.4 加载 / 空 / 错误三态规范
+### 8.4 加载 / 空 / 错误三态规范
 
 | 状态 | 判定条件 | 表现 |
 | --- | --- | --- |
@@ -310,9 +367,9 @@ flowchart TB
 
 ---
 
-## 8. 设计系统
+## 9. 设计系统
 
-### 8.1 色彩
+### 9.1 色彩
 
 | 角色 | 值 | 用途 |
 | --- | --- | --- |
@@ -331,7 +388,7 @@ flowchart TB
 
 **渐变规范**：强调渐变统一为 `linear-gradient(135deg, #1D4ED8 0%, #2563EB 45%, #06B6D4 100%)`，用于指标数字、时间线竖线与节点、主按钮、横幅背景。
 
-### 8.2 字体与排版
+### 9.2 字体与排版
 
 | 角色 | 字号 / 字重 / 行高 | 说明 |
 | --- | --- | --- |
@@ -345,7 +402,7 @@ flowchart TB
 
 字族：`"PingFang SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", sans-serif`；数字区域启用 `font-variant-numeric: tabular-nums` 保证对齐全。
 
-### 8.3 空间、圆角与阴影
+### 9.3 空间、圆角与阴影
 
 | 令牌 | 值 |
 | --- | --- |
@@ -358,7 +415,7 @@ flowchart TB
 | 阴影-悬浮 | `0 2px 4px rgba(15,23,42,.06), 0 16px 40px rgba(37,99,235,.14)` |
 | 导航栏高度 | `64px`（`h-16`） |
 
-### 8.4 玻璃拟态配方
+### 9.4 玻璃拟态配方
 
 ```text
 bg-white/70 backdrop-blur-xl border border-white/60 shadow-glass rounded-2xl
@@ -366,7 +423,7 @@ bg-white/70 backdrop-blur-xl border border-white/60 shadow-glass rounded-2xl
 
 深色模式下对应 `bg-slate-900/60 border-white/10`。
 
-### 8.5 微动效清单
+### 9.5 微动效清单
 
 | 场景 | 动效 | 参数 |
 | --- | --- | --- |
@@ -381,9 +438,9 @@ bg-white/70 backdrop-blur-xl border border-white/60 shadow-glass rounded-2xl
 
 ---
 
-## 9. 响应式设计
+## 10. 响应式设计
 
-### 9.1 断点
+### 10.1 断点
 
 | 断点 | 宽度 | 指标卡布局 | 其他调整 |
 | --- | --- | --- | --- |
@@ -391,15 +448,15 @@ bg-white/70 backdrop-blur-xl border border-white/60 shadow-glass rounded-2xl
 | `md` | 768 – 1279px | 3 列（5 张卡换行） | 图表上下堆叠；详情表格纵向排列 |
 | `lg` | ≥ 1280px | 5 列等宽 | 图表左右并排（2:1）；表格全量列展示 |
 
-### 9.2 移动端要点
+### 10.2 移动端要点
 
 - 导航栏在小屏下折叠为汉堡按钮 + 抽屉菜单，抽屉使用玻璃拟态背景。
 - 时间线卡片左右内边距压缩，地点与官网信息换行展示。
-- 表格横向滚动时首列（组织名）`sticky left-0` 固定，背景不透明以免透视。
+- 表格横向滚动时首列（组织名）`sticky left-0` 固定，背景不透明以免透视；例会矩阵沿用同一 sticky 首列策略，列头常驻个人出席率副标签。
 
 ---
 
-## 10. 主题（浅色 / 深色）
+## 11. 主题（浅色 / 深色）
 
 - 实现方式：`<html class="dark">` + Tailwind `darkMode: 'class'`。
 - 状态管理：主题偏好存 `localStorage`；首次访问读取 `prefers-color-scheme`。
@@ -409,7 +466,7 @@ bg-white/70 backdrop-blur-xl border border-white/60 shadow-glass rounded-2xl
 
 ---
 
-## 11. 可访问性（A11y）
+## 12. 可访问性（A11y）
 
 | 要求 | 实现 |
 | --- | --- |
@@ -422,7 +479,7 @@ bg-white/70 backdrop-blur-xl border border-white/60 shadow-glass rounded-2xl
 
 ---
 
-## 12. 与后端的解耦承诺
+## 13. 与后端的解耦承诺
 
 | 承诺 | 说明 |
 | --- | --- |

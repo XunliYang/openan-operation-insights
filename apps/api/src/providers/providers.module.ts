@@ -3,6 +3,7 @@ import { JsonContributionProvider } from './json/json-contribution.provider';
 import { JsonContributorContributionProvider } from './json/json-contributor-contribution.provider';
 import { JsonHomeMetricProvider } from './json/json-home-metric.provider';
 import { JsonInsightProvider } from './json/json-insight.provider';
+import { JsonMeetingAttendanceProvider } from './json/json-meeting-attendance.provider';
 import { JsonSummitProvider } from './json/json-summit.provider';
 import { JsonOrganizationProvider } from './json/json-organization.provider';
 import { JsonMapProvider } from './json/json-map.provider';
@@ -11,6 +12,7 @@ import {
   CONTRIBUTOR_CONTRIBUTION_PORT,
   HOME_METRIC_PORT,
   INSIGHT_PORT,
+  MEETING_ATTENDANCE_PORT,
   SUMMIT_PORT,
   ORGANIZATION_PORT,
   MAP_PORT,
@@ -37,6 +39,8 @@ import {
     { provide: INSIGHT_PORT, useClass: JsonInsightProvider },
     { provide: SUMMIT_PORT, useClass: JsonSummitProvider },
     { provide: MAP_PORT, useClass: JsonMapProvider },
+    // 例会台账经采集脚本落盘，接口侧恒为 JSON 读实现（ADR-0005）
+    { provide: MEETING_ATTENDANCE_PORT, useClass: JsonMeetingAttendanceProvider },
   ],
   exports: [
     HOME_METRIC_PORT,
@@ -46,6 +50,7 @@ import {
     INSIGHT_PORT,
     SUMMIT_PORT,
     MAP_PORT,
+    MEETING_ATTENDANCE_PORT,
   ],
 })
 export class ProvidersModule {}

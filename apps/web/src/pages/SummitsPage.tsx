@@ -98,7 +98,7 @@ export function SummitsPage() {
       <PageHeading
         eyebrow="Community Summits"
         title="参会情况"
-        description="社区峰会、全体峰会与 SIG 例会的台账：会期、参会规模、参会组织名单与峰会成果。"
+        description="社区峰会与全体峰会的台账：会期、参会规模、参会组织名单与峰会成果。"
         meta={
           <>
             <Badge tone="violet">峰会台账</Badge>
@@ -130,7 +130,7 @@ export function SummitsPage() {
               metric={{ value: stats.total, unit: '场' }}
               icon={<IconCalendar width={17} height={17} />}
               tone="brand"
-              hint="含峰会、全体峰会与 SIG 例会"
+              hint="含峰会与全体峰会"
               delay={0}
             />
             <StatCard

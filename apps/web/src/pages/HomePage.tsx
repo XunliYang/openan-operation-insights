@@ -75,7 +75,7 @@ export function HomePage() {
               metric={summary.data.summitCount}
               icon={<IconSparkle width={17} height={17} />}
               tone="violet"
-              hint="含峰会、全会与 SIG 例会"
+              hint="含峰会与全体峰会"
               delay={140}
             />
             <StatCard

@@ -50,27 +50,40 @@ export interface AppConfig {
   nodeEnv: string;
   port: number;
   dataDir: string;
+  /** 例会台账（Excel）源文件路径：仅供采集脚本使用，API 不读取（见 03 文档 §7） */
+  meetingsSourcePath: string;
   corsOrigins: string[];
   cacheTtlSeconds: number;
   logLevel: string;
   github: GithubConfig;
 }
 
-export default (): AppConfig => ({
-  nodeEnv: process.env.NODE_ENV?.trim() || 'development',
-  port: toNumber(process.env.PORT, 3000),
-  dataDir: resolveDataDir(),
-  corsOrigins: (process.env.CORS_ORIGINS ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter((origin) => origin.length > 0),
-  cacheTtlSeconds: toNumber(process.env.CACHE_TTL_SECONDS, 300),
-  logLevel: process.env.LOG_LEVEL?.trim() || 'log',
-  github: {
-    token: process.env.GITHUB_TOKEN?.trim() ?? '',
-    orgs: splitList(process.env.GITHUB_ORGS),
-    repos: splitList(process.env.GITHUB_REPOS),
-    lookbackDays: toNumber(process.env.GITHUB_LOOKBACK_DAYS, 3650),
-    endpoint: process.env.GITHUB_API_ENDPOINT?.trim() || undefined,
-  },
-});
+/** 例会台账源文件：MEETINGS_SOURCE_PATH 优先，否则默认 <dataDir>/source/meetings.xlsx */
+function resolveMeetingsSourcePath(dataDir: string): string {
+  const fromEnv = process.env.MEETINGS_SOURCE_PATH?.trim();
+  return fromEnv ? resolve(process.cwd(), fromEnv) : resolve(dataDir, 'source', 'meetings.xlsx');
+}
+
+export default (): AppConfig => {
+  const dataDir = resolveDataDir();
+
+  return {
+    nodeEnv: process.env.NODE_ENV?.trim() || 'development',
+    port: toNumber(process.env.PORT, 3000),
+    dataDir,
+    meetingsSourcePath: resolveMeetingsSourcePath(dataDir),
+    corsOrigins: (process.env.CORS_ORIGINS ?? '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0),
+    cacheTtlSeconds: toNumber(process.env.CACHE_TTL_SECONDS, 300),
+    logLevel: process.env.LOG_LEVEL?.trim() || 'log',
+    github: {
+      token: process.env.GITHUB_TOKEN?.trim() ?? '',
+      orgs: splitList(process.env.GITHUB_ORGS),
+      repos: splitList(process.env.GITHUB_REPOS),
+      lookbackDays: toNumber(process.env.GITHUB_LOOKBACK_DAYS, 3650),
+      endpoint: process.env.GITHUB_API_ENDPOINT?.trim() || undefined,
+    },
+  };
+};
