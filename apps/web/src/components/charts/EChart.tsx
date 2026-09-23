@@ -29,8 +29,8 @@ export function EChart({ option, height = 280, className, onEvent, ariaLabel }: 
     chartRef.current = chart;
 
     const observer = new ResizeObserver(() => {
-      // 实例已 dispose 时（React StrictMode 双调用 / 卸载后排队回调），
-      // 内部 _dom 已被置空，再 resize 会读 null 的 getBoundingClientRect
+      // 幂等守卫：StrictMode 双挂载 / 卸载后排队回调可能命中已 dispose 的实例；
+      // echarts 5.6 的 resize() 内部已有 _disposed 早退（仅告警不抛错），此处显式跳过以免产生误导性告警。
       if (!chart.isDisposed()) chart.resize();
     });
     observer.observe(container);
@@ -43,12 +43,14 @@ export function EChart({ option, height = 280, className, onEvent, ariaLabel }: 
   }, []);
 
   useEffect(() => {
-    chartRef.current?.setOption(option, true);
+    const chart = chartRef.current;
+    // 幂等守卫：卸载后（StrictMode 双调用时序）不重复 setOption
+    if (chart && !chart.isDisposed()) chart.setOption(option, true);
   }, [option]);
 
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !onEvent) return;
+    if (!chart || chart.isDisposed() || !onEvent) return;
 
     chart.on('click', onEvent);
     return () => {

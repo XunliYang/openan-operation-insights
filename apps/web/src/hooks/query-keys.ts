@@ -14,7 +14,14 @@ export const queryKeys = {
     ['contributions', 'summary', { orgIds: params.orgIds ?? [], from: params.from ?? '', to: params.to ?? '' }] as const,
   insights: (params: ActivityParams) =>
     ['insights', { orgIds: params.orgIds ?? [], from: params.from ?? '', to: params.to ?? '' }] as const,
+  contributorContributions: (params: ActivityParams) =>
+    [
+      'contributors',
+      'contributions',
+      { orgIds: params.orgIds ?? [], from: params.from ?? '', to: params.to ?? '' },
+    ] as const,
   summits: (year?: number, includeDetail?: boolean, page?: number, pageSize?: number) =>
     ['summits', { year: year ?? null, includeDetail: includeDetail ?? false, page: page ?? 1, pageSize: pageSize ?? 20 }] as const,
   summitDetail: (id: string) => ['summits', 'detail', id] as const,
+  meetings: ['meetings'] as const,
 };
