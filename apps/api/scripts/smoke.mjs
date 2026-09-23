@@ -1,5 +1,5 @@
 /**
- * 接口冒烟脚本：逐个请求五个核心端点并校验响应信封。
+ * 接口冒烟脚本：逐个请求核心端点并校验响应信封。
  * 用法：先启动服务（npm run dev:api），再执行 npm run smoke -w @openan/api
  */
 const BASE = process.env.API_BASE ?? 'http://localhost:3000/api';
@@ -15,6 +15,7 @@ const cases = [
   { name: '峰会列表', path: '/summits?includeDetail=false&page=1&pageSize=10', expect: (d) => Array.isArray(d.items) },
   { name: '峰会详情', path: '/summits/one-summit-2026', expect: (d) => d.id === 'one-summit-2026' },
   { name: '峰会不存在→40402', path: '/summits/not-exist', expectError: 40402 },
+  { name: '例会参会矩阵', path: '/meetings', expect: (d) => Array.isArray(d.columns) && Array.isArray(d.rows) },
   { name: '非法排序字段→40001', path: '/contributions?sortBy=oops', expectError: 40001 },
   { name: '非法年份→40003', path: '/summits?year=1999', expectError: 40003 },
   { name: '地图源列表', path: '/maps', expect: (d) => Array.isArray(d) && d.some((s) => s.sourceId === 'ecosystem-participants') },

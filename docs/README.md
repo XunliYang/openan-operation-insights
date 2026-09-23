@@ -3,19 +3,20 @@
 本目录是 **OpenAN Community Operation Insights（社区运营洞察平台）** 的架构设计文档集。
 
 **当前状态**：设计基线已定稿并进入实现阶段。代码工程（`apps/api`、`apps/web`）与种子数据（`data/`）已落地，本目录作为设计与契约基线持续维护。
-**文档版本**：v1.0 ｜ **最后更新**：2026-09-18
+**文档版本**：v1.6 ｜ **最后更新**：2026-09-23
 
 ---
 
 ## 1. 项目说明
 
-一个面向 OpenAN 社区运营团队的**数据看板网站**，由一个顶部导航栏与三个内容页组成，用于集中呈现社区规模指标、各成员单位的贡献度，以及历次峰会信息。
+一个面向 OpenAN 社区运营团队的**数据看板网站**，由一个顶部导航栏与四个内容页组成，用于集中呈现社区规模指标、各成员单位的贡献度、历次峰会信息，以及例会参会情况。
 
 | 页面 | 路由 | 核心内容 |
 | --- | --- | --- |
 | 首页 | `/` | 社区伙伴数量、外部开发者数量、参加的峰会、应用案例、下一次峰会、贡献的组织 |
 | 社区活跃度情况 | `/activity` | 按组织汇总的 PR / Issue / 代码量，需求 / best-practice 案例，以及组织提交占比分布 |
 | 参会情况 | `/summits` | 峰会时间线（名称、时间、地点、官网）+ 每场峰会的详情表格 |
+| 例会参会情况 | `/meetings` | 例会参会矩阵（人 × 日期），行头附当次出席人数、列头附个人出席率 |
 
 ---
 
@@ -24,7 +25,7 @@
 | 文档 | 内容 | 主要读者 |
 | --- | --- | --- |
 | [01-architecture-overview.md](./01-architecture-overview.md) | 系统上下文、分层架构、技术选型与理由、架构原则、部署形态、目录与命名约定、风险登记 | 所有人、评审者 |
-| [02-frontend-design.md](./02-frontend-design.md) | 路由设计、三页面区块拆解与**字段级清单**、组件树、TanStack Query 缓存策略、设计系统、响应式与主题 | 前端工程师、设计师 |
+| [02-frontend-design.md](./02-frontend-design.md) | 路由设计、四页面区块拆解与**字段级清单**、组件树、TanStack Query 缓存策略、设计系统、响应式与主题 | 前端工程师、设计师 |
 | [03-backend-design.md](./03-backend-design.md) | NestJS 模块划分、分层职责、**Provider 端口接口签名**、DI Token 与绑定集中点、采集器读写分离、JSON 仓储原子写、DTO、错误码表、日志规范 | 后端工程师 |
 | [04-data-and-api-contract.md](./04-data-and-api-contract.md) | **JSON 数据模型 schema**、实体字段定义、完整数据样例、**REST 接口契约**、契约治理 | 前后端工程师（必读） |
 | [05-integration-roadmap.md](./05-integration-roadmap.md) | GitHub / Confluence 采集设计、增量与限流策略、调度与缓存、数据校验与回滚、里程碑与验收标准 | 后端工程师、运营负责人 |
@@ -69,7 +70,7 @@ flowchart LR
 
 **端口-适配器（Ports & Adapters）**：业务层只依赖 `Port` 接口，具体实现由 DI Token 绑定，使业务逻辑对数据来源无感知。
 
-**但数据源的演进不走端口切换。** 按「采集写、接口读」的读写分离设计，采集器（`apps/api/src/collector`）把外部数据落盘为与种子数据**完全相同**的 JSON 结构，API 的五个端口**恒为 JSON 实现**：
+**但数据源的演进不走端口切换。** 按「采集写、接口读」的读写分离设计，采集器（`apps/api/src/collector`）把外部数据落盘为与种子数据**完全相同**的 JSON 结构，API 的六个端口**恒为 JSON 实现**：
 
 ```text
 采集链路（写入）：GitHub API → collector/（映射、归并）→ data/*.json
@@ -111,6 +112,7 @@ flowchart LR
 | 需求 / best-practice | `data/insights.json` | 人工维护 | **Confluence API** |
 | 个人贡献者档案 | `data/contributors.json` | 人工维护 | **GitHub API**（按 `githubId` 归并） |
 | 峰会时间线与详情 | `data/summits.json` | 人工维护 | 同左（人工维护） |
+| 例会参会矩阵 | `data/meetings.json`（源台账 `data/source/meetings.xlsx`） | 人工维护 Excel → 采集脚本 | **Zoom API**（远期） |
 
 ---
 
@@ -120,7 +122,7 @@ flowchart LR
 | --- | --- | --- |
 | **社区伙伴** | Partner | 与 OpenAN 社区签署共建协议的单位（企业/机构）。对应 `Organization.type = 'partner'` |
 | **外部开发者** | External Developer | 以个人身份参与社区贡献的开发者，不代表任何单位。对应 `Organization.type = 'external'` |
-| **贡献者** | Contributor | 以 GitHub 账号为维度的个人档案。`orgId` 为空表示独立贡献者，见 04 文档 3.7 节 |
+| **贡献者** | Contributor | 以 GitHub 账号为维度的个人档案（人工维护字段 + 采集回填的 `github` 指标）。`orgId` 为空表示独立贡献者，见 04 文档 3.7 节 |
 | **社区组织** | Community Org | 社区自身的运营与维护组织。对应 `Organization.type = 'community'` |
 | **应用案例** | Use Case | 基于 OpenAN 能力构建并对外发布的实践案例，计入首页 `useCaseCount` |
 | **需求** | Requirement | 在 Confluence 中登记的功能或适配需求，按条数统计 |
@@ -130,6 +132,10 @@ flowchart LR
 | **贡献的组织** | Contributing Organizations | 首页展示的组织卡片墙：展示**全部**组织档案，按综合贡献分降序排列；零分组织居末并显示「暂无贡献」（见 ADR-0001） |
 | **组织贡献明细** | Activity Detail | 活跃度页明细表：以组织档案为底表展示**全部**组织，无贡献记录的指标按 0 计、更新时间与仓库数显示「—」（见 ADR-0002） |
 | **组织贡献分布** | Org Contribution Distribution | 活跃度页环形图：按 `github.commits` 统计各组织提交占比，占比低于 3% 或超出 6 个具名扇区上限的组织并入「其他」，头部组织始终保留具名扇区（见 ADR-0003） |
+| **个人贡献排行** | Contributor Leaderboard | 活跃度页右列排行卡：按所选 GitHub 指标展示前 8 位贡献者（含独立开发者），取数自 `GET /api/contributor-contributions`（见 ADR-0004） |
+| **例会** | Meeting | 社区定期召开的例会，独立于峰会（见 ADR-0005）。本期仅记录参会情况，不记录时长 / 主持人 / 议程 |
+| **例会参会矩阵** | Meeting Attendance Matrix | 例会页「人（横）× 日期（竖）」二维矩阵，直接照搬 Excel 台账，**无主键、不规范化、不可重排**（见 ADR-0005 / 04 §3.8） |
+| **出席率** | Attendance Rate | 个人出席次数 / 全部例会场次。因空白计入缺席，成员加入前的历史空白亦进分母（见 ADR-0005 负债） |
 | **端口 / 适配器** | Port / Adapter | 架构模式：Port 是接口定义，Adapter 是具体数据源实现 |
 | **契约** | Contract | 由 04 文档定义的字段与接口规范，前后端共同遵守 |
 
@@ -155,11 +161,12 @@ flowchart LR
 | # | 事项 | 负责方 | 关联文档 |
 | --- | --- | --- | --- |
 | 1 | 按 04 文档创建 `data/*.json` 种子数据 | 后端 + 运营 | 04 第 4 章 |
-| 2 | 搭建前端工程并按 02 文档实现三个页面 | 前端 | 02 |
+| 2 | 搭建前端工程并按 02 文档实现四个页面 | 前端 | 02 |
 | 3 | 搭建后端工程并按 03 文档实现模块与端口 | 后端 | 03 |
 | 4 | 产出 GitHub 作者 ↔ `orgId` 映射清单 | 运营 | 05 第 2.6 节 |
 | 5 | 规范 Confluence 标签与"所属组织"字段 | 运营 | 05 第 3 章 |
 | 6 | 确认部署形态与 `data/` 持久化方案 | 运维 | 01 第 8 章 |
+| 7 | 维护例会 Excel 台账并执行 `npm run collect:meetings` 生成 `data/meetings.json` | 运营 | 05 第 10 节 |
 
 ---
 
@@ -176,3 +183,5 @@ flowchart LR
 | v1.2 | 2026-09-21 | 首页组织墙改为全量组织按综合贡献分降序（[ADR-0001](./adr/0001-homepage-org-wall-shows-all-orgs.md)）：04 §5.3.2 `scope=contributing` 语义更新并补充 `contributionScore`/`contributionLevel` 响应字段说明；03 §4.1 端口签名移除未使用的 `scope` 字段、时序图修正；02 §3.1/3.2 字段清单与零分卡片描述更新；README 术语表「贡献的组织」重定义 |
 | v1.3 | 2026-09-21 | 活跃度明细表纳入全部组织（[ADR-0002](./adr/0002-activity-table-includes-all-orgs.md)）：02 §4.1/4.2 数据源更新为三源合并（组织档案为底表），补充零值行与排行榜过滤描述；README 术语表新增「组织贡献明细」 |
 | v1.4 | 2026-09-21 | 活跃度环形图改为按组织提交数统计（[ADR-0003](./adr/0003-activity-donut-by-org-commits.md)）：02 §4.1/4.2 环形图口径改为组织维度 `github.commits`、占比低于 3% 并入「其他」；04 §5.2/5.3.5 `/contributions/summary` 用途收窄（环形图改用 `/contributions`）；01/03 相关表述同步；README 术语表新增「组织贡献分布」 |
+| v1.5 | 2026-09-21 | 活跃度页排行榜由组织维度改为个人维度（[ADR-0004](./adr/0004-activity-rank-by-contributor.md)）：04 §3.7 补充 `github` 字段并改写定位说明、§4.5 样例补 `github`、§5.2 新增 `GET /api/contributor-contributions`、新增 §5.3.8 详细定义；02 §2.1/4.1/4.2/4.3 更新为个人贡献排行（含独立开发者、头像降级、独立错误态）；README 术语表新增「个人贡献排行」并修订「贡献者」 |
+| v1.6 | 2026-09-23 | 新增「例会参会情况」独立实体（[ADR-0005](./adr/0005-meeting-attendance-matrix.md)）：新增 `data/meetings.json`（人 × 日期矩阵）与源台账 `data/source/meetings.xlsx`、采集脚本 `apps/api/scripts/import-meetings.ts`；04 新增 §3.8 实体、§4.7 样例、§5.3.9 `GET /api/meetings`；02 新增 §6 页面设计（原 §6–§12 顺延为 §7–§13）、路由与组件树补入 `/meetings`；01 页面 / 数据文件 / 目录 / 风险同步；05 新增 §10 例会接入设计；术语表新增「例会 / 例会参会矩阵 / 出席率」 |

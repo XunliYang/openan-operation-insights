@@ -1,6 +1,8 @@
 import {
   Contributor,
   HomeFileData,
+  MeetingAttendanceMatrix,
+  MeetingAttendanceRow,
   SummitDetail,
   MetricValue,
   Organization,
@@ -10,6 +12,9 @@ import {
   MapSource,
   ManualMapMarker,
 } from '../contract/entities';
+
+/** 例会日期固定为 YYYY-MM-DD（04 文档 §3.8） */
+const MEETING_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -150,6 +155,36 @@ export function isSummitDetail(value: unknown): value is SummitDetail {
 
 export function isSummitDetailArray(value: unknown): value is SummitDetail[] {
   return Array.isArray(value) && value.every(isSummitDetail);
+}
+
+function isMeetingAttendanceRow(value: unknown): value is MeetingAttendanceRow {
+  if (!isObject(value)) return false;
+  return (
+    isString(value.date) &&
+    MEETING_DATE_PATTERN.test(value.date) &&
+    Array.isArray(value.attendance) &&
+    value.attendance.every(isBoolean)
+  );
+}
+
+/**
+ * 例会参会矩阵（04 文档 §3.8）：
+ * - columns 非空字符串数组；
+ * - 每行 date 为 YYYY-MM-DD，attendance 与 columns 等长；
+ * - updatedAt 可选。
+ */
+export function isMeetingAttendanceMatrix(value: unknown): value is MeetingAttendanceMatrix {
+  if (!isObject(value)) return false;
+  const columns = value.columns;
+  if (!isStringArray(columns) || columns.length === 0) return false;
+
+  const rows = value.rows;
+  if (!Array.isArray(rows) || !rows.every(isMeetingAttendanceRow)) return false;
+  if (!rows.every((row) => (row as MeetingAttendanceRow).attendance.length === columns.length)) {
+    return false;
+  }
+
+  return value.updatedAt === undefined || isString(value.updatedAt);
 }
 
 export function isHomeFileData(value: unknown): value is HomeFileData {

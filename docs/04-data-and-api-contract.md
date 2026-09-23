@@ -15,6 +15,7 @@
 | `data/insights.json` | `JsonFileEnvelope<OrganizationInsight[]>` | Confluence 维度贡献 | 数十 |
 | `data/contributors.json` | `JsonFileEnvelope<Contributor[]>` | 个人贡献者档案（GitHub 账号维度） | 数百 |
 | `data/summits.json` | `JsonFileEnvelope<SummitDetail[]>` | 峰会时间线与详情 | 十余 |
+| `data/meetings.json` | `JsonFileEnvelope<MeetingAttendanceMatrix>` | 例会参会矩阵（人 × 日期） | 1 |
 
 ### 1.1 通用文件信封
 
@@ -78,6 +79,11 @@ erDiagram
     string hostOrgId FK "可空"
     string[] attendingOrganizations
   }
+  MEETING_ATTENDANCE {
+    string[] columns "列名即人名（非主键）"
+    string date "行头，YYYY-MM-DD"
+    boolean[] attendance "与 columns 等长"
+  }
 ```
 
 **关联规则**：
@@ -89,6 +95,7 @@ erDiagram
 - 允许"有组织但无贡献记录"（新加入、暂未贡献）：此时接口返回该组织，指标补 `0`。
 - 允许"有贡献记录但组织档案缺失"：`Service` 层以贡献记录内的 `orgName`/`logoUrl` 兜底，并记录 `WARN` 日志提示数据维护缺失。
 - `attendingOrganizations` **存组织名称字符串**（便于人工维护可读性），`Service` 层负责按 `name`/`aliases` 反查 `orgId` 以便跳转。
+- `MeetingAttendanceMatrix` **与任何实体都不关联**（独立实体，见 ADR-0005）：其 `columns` 是 Excel 台账表头**原文**（人名），**不是主键**，也不关联 `Organization` / `Contributor`，因此**不参与**组织归属判定与个人贡献统计口径。
 
 ---
 
@@ -99,6 +106,7 @@ erDiagram
 | 组织 | `orgId` | kebab-case，与 GitHub 组织名对齐（小写） | `openan-labs` |
 | 贡献者 | `contributorId` | kebab-case，与 GitHub login 对齐（小写） | `octocat` |
 | 峰会 | `id` | kebab-case + 年份 | `openan-summit-2026` |
+| 例会参会矩阵 | **无主键** | 行 = 日期（`YYYY-MM-DD`），列 = 人名原文 | — |
 
 **时间规范**：
 - 所有时间字段均为 **ISO 8601 UTC** 字符串（带 `Z`），如 `"2026-09-18T09:00:00Z"`。
@@ -107,7 +115,7 @@ erDiagram
 
 **命名规范**：
 - JSON 与 API 字段统一 `camelCase`。
-- 布尔字段 `is` / `has` 前缀。
+- 布尔字段 `is` / `has` 前缀。**唯一例外**：例会矩阵单元格 `present` 采用直陈式（`true` = 出席），因它是矩阵值而非实体属性。
 - 数组字段使用复数名词（`tags`、`outcomes`）。
 - 计数字段使用具体名词而非 `count` 后缀堆叠（`pullRequests`、`requirements`）。
 
@@ -249,8 +257,31 @@ erDiagram
 | `avatarUrl` | string | ❌ | GitHub 头像；为空时前端降级为首字母色块 |
 | `joinedAt` | string | ❌ | 首次参与社区贡献的时间，用于"新增贡献者"类统计 |
 | `description` | string | ❌ | 一句话简介，用于卡片悬浮提示 |
+| `github` | object | ❌ | GitHub 协作指标（`pullRequests`/`commits`/`issues`/`linesChanged`/`repos`，结构见 3.2）；**由采集器按轮回填**，人工维护的纯档案可能缺失该字段 |
 
-> **定位说明**：本实体**数据先行**——本期仅落在 `data/contributors.json` 人工维护，不提供独立 API 与端口；阶段三 GitHub 采集以 `githubId` 归并个人 PR/Issue，并可推导首页 `externalDeveloperCount` 指标（`orgId` 为空的独立贡献者计数）。
+> **定位说明**：本实体是「人工维护档案 + 采集回填指标」的混合实体。`joinedAt`、`description` 等字段由运营维护，`github` 指标由 GitHub 采集器以 `githubId` 归并个人 PR / Issue / 提交后写入（full 模式重算，增量模式在既有指标上叠加）。只读接口为 `GET /api/contributor-contributions`（见 5.3.8），**仅返回带 `github` 指标的个人**；`orgId` 为空的独立贡献者计入伪组织 `unattributed`，其人数同时写回 `home.json` 的 `externalDeveloperCount`。
+
+### 3.8 `MeetingAttendanceMatrix`（例会参会矩阵）
+
+> **独立实体**：与峰会、组织、贡献者**无任何关联**（ADR-0005）。定位是「把人 × 日期的二维台账**照搬**进 JSON」，**刻意不做规范化**。
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `columns` | string[] | ✅ | 列头，即人名**原文**（照搬 Excel 表头，保留原序与原文，含空格）。**非主键**，重名 / 改名 / 空格差异会产生重复列 |
+| `rows` | `MeetingAttendanceRow[]` | ✅ | 每次例会一行，**保持 Excel 原序** |
+| `updatedAt` | string | ❌ | 台账最后同步时间，由采集器写入 |
+
+`MeetingAttendanceRow`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `date` | string | ✅ | 例会日期，`YYYY-MM-DD` |
+| `attendance` | boolean[] | ✅ | 出席标记，**与 `columns` 等长、同序**；`true` = 出席，`false` = 缺席 |
+
+> **口径声明**（必须在前端可查，见 02 §6.3）：
+> - **空白 = 缺席**：台账中未标记的格子一律解析为 `false` 并计入出席率分母。因此**成员加入前的历史空白同样计入缺席**，会系统性拉低后加入者的出席率——这是 ADR-0005 明知并接受的负债。
+> - **不含会议元信息**：无时长、主持人、议程、地点等字段（ADR-0005 明确放弃）。
+> - **不含聚合字段**：个人出席率（`present / rows.length`）与每场出席人数均由**前端**派生，接口不返回。
 
 ---
 
@@ -445,7 +476,14 @@ erDiagram
       "orgId": "nova-silicon",
       "avatarUrl": "https://avatars.githubusercontent.com/u/100200301?v=4",
       "joinedAt": "2023-08-02T00:00:00Z",
-      "description": "NPU 驱动核心贡献者"
+      "description": "NPU 驱动核心贡献者",
+      "github": {
+        "pullRequests": 18,
+        "commits": 96,
+        "issues": 7,
+        "linesChanged": 24310,
+        "repos": 4
+      }
     },
     {
       "contributorId": "aria-dev",
@@ -560,6 +598,26 @@ erDiagram
 }
 ```
 
+### 4.7 `data/meetings.json`
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-09-18T09:00:00Z",
+  "data": {
+    "columns": ["张三", "李四", "王五", "赵六"],
+    "rows": [
+      { "date": "2026-09-18", "attendance": [true, true, true, false] },
+      { "date": "2026-09-11", "attendance": [true, false, true, true] },
+      { "date": "2026-09-04", "attendance": [true, true, false, true] }
+    ],
+    "updatedAt": "2026-09-18T09:00:00Z"
+  }
+}
+```
+
+> 说明：`columns` 取自台账表头原文；新增成员追加在**末尾**，离场成员**保留列**（历史出席不可抹除）；`rows` 按台账原序排列，接口不做重排（ADR-0005）。本文件由 `apps/api/scripts/import-meetings.ts` 从 `data/source/meetings.xlsx` 生成，日常只维护 Excel（见 05 文档第 10 节）。
+
 ---
 
 ## 5. REST 接口契约
@@ -591,6 +649,8 @@ erDiagram
 | 5 | GET | `/api/contributions/summary` | 贡献聚合总量 | 社区活跃度（页头更新时间等） |
 | 6 | GET | `/api/summits` | 峰会列表（可含详情） | 参会情况 |
 | 7 | GET | `/api/summits/:id` | 单场峰会详情 | 参会情况（预留跳转） |
+| 8 | GET | `/api/contributor-contributions` | 个人 GitHub 维度贡献 | 社区活跃度（个人贡献排行） |
+| 9 | GET | `/api/meetings` | 例会参会矩阵（人 × 日期） | 例会参会情况 |
 
 ### 5.3 接口详细定义
 
@@ -833,6 +893,87 @@ erDiagram
 
 ---
 
+#### 5.3.8 `GET /api/contributor-contributions`
+
+**用途**：社区活跃度页「个人贡献排行」卡（见 02 §4.1 与 ADR-0004）。按**个人维度**返回 GitHub 协作指标，回答「社区里谁投入最多」，与组织维度接口（5.3.3）互补。
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `orgIds` | string | 否 | — | 组织筛选，逗号分隔（语义同 5.3.3）；`orgId` 为空的独立贡献者按伪组织 `unattributed` 匹配 |
+| `from` | ISO 8601 | 否 | — | 起始时间；**阶段一接受但不生效**（见下方口径） |
+| `to` | ISO 8601 | 否 | — | 结束时间；同上 |
+| `sortBy` | string | 否 | `commits` | 可选 `pullRequests` / `commits` / `issues` / `linesChanged` / `repos` |
+| `order` | string | 否 | `desc` | `asc` / `desc` |
+| `limit` | number | 否 | — | 1–200；不传返回全部 |
+
+**响应 `data`**：`ContributorContribution[]`——即 `Contributor`（字段见 3.7）**且 `github` 恒有值**。仅返回采集到贡献记录的个人，人工维护但本轮无贡献记录的档案不会出现在结果中。
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": [
+    {
+      "contributorId": "zhoujie628",
+      "githubId": 1234567,
+      "name": "Jie Zhou",
+      "orgId": "huawei",
+      "avatarUrl": "https://avatars.githubusercontent.com/u/1234567?v=4",
+      "github": {
+        "pullRequests": 127,
+        "commits": 548,
+        "issues": 78,
+        "linesChanged": 198930,
+        "repos": 7
+      }
+    }
+  ]
+}
+```
+
+**默认排序**：按 `sortBy`（默认 `commits`）**降序**，排序在服务端完成；前端在返回数据上按所选指标二次排序并取 Top 8（总量为数十条，不传接口 `limit`，避免与页面筛选参数形成第二套口径）。
+
+> **口径说明**：
+>
+> - 个人指标与组织指标（5.3.3）由**同一轮采集的同批记录**聚合而来，两者合计恒等（个人之和 = 组织之和，含伪组织 `unattributed` 行），可互相核对；
+> - `orgIds` 命中规则：`orgId` 为空的独立贡献者按伪组织 `unattributed` 参与筛选，因此可以单独查看该人群；
+> - `from` / `to` 在阶段一接受但不生效（采集侧暂未按时间切片个人记录），前端在卡片底部给出同期口径提示；
+> - 仅使用 GitHub 公开数据（`name` / `avatarUrl` / 协作计数），邮箱等身份信息只用于内存中的组织归属判定，**不落盘**。
+
+#### 5.3.9 `GET /api/meetings`
+
+**用途**：例会参会情况页（`/meetings`）的矩阵数据，**透传** `data/meetings.json`（ADR-0005）。
+
+**请求参数**：无。
+
+**响应 `data`**：`MeetingAttendanceMatrix`（见 3.8），**原样返回**——不排序、不聚合、不补全：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "columns": ["张三", "李四", "王五", "赵六"],
+    "rows": [
+      { "date": "2026-09-18", "attendance": [true, true, true, false] },
+      { "date": "2026-09-11", "attendance": [true, false, true, true] },
+      { "date": "2026-09-04", "attendance": [true, true, false, true] }
+    ],
+    "updatedAt": "2026-09-18T09:00:00Z"
+  }
+}
+```
+
+**排序**：**不排序**——严格保持 `meetings.json` 中 `columns` 与 `rows` 的原序（ADR-0005）。这是对 5.1 通用约定「前端可再对已获取数据做本地排序」的**明确例外**：本接口返回的矩阵**禁止前端重排**。
+
+**校验规则**：`attendance.length !== columns.length`，或 `date` 不匹配 `YYYY-MM-DD` → `50001`（数据文件结构损坏，语义同 5.3.1）。该校验由采集器在落盘前保证，接口层仅做防御性检查。
+
+**失败场景**：`50001`（`meetings.json` 缺失或结构损坏）。
+
+---
+
 ## 6. 契约治理
 
 ### 6.1 变更流程
@@ -852,10 +993,12 @@ erDiagram
 | `type = 'external'` | 非社区成员 | 独立外部开发者（非单位身份） |
 | `type = 'individual'` | 一个真人 / 一家组织 | **伪组织** `unattributed` 专用类型，代表「未归属的独立开发者聚合」 |
 | `isUpcoming` | 未开始 | **未结束**（进行中的峰会同样为 `true`） |
+| `MeetingAttendanceMatrix.columns` | 主键 / 稳定标识 | 台账表头**原文**（人名），非主键，靠台账人工保持一致 |
+| `attendance[i] = false` | 该人明确请假 | **未出席**（含「尚未加入」的历史空白），且计入出席率分母 |
 
 ### 6.3 契约自检清单
 
-- [ ] 三个页面的每个展示字段，都能在本文档中找到对应定义
+- [ ] 四个页面的每个展示字段，都能在本文档中找到对应定义
 - [ ] `data/*.json` 中不存在本文档未定义的字段
 - [ ] 所有必填字段在种子数据中均已提供
 - [ ] 可选字段在前端均有降级展示策略
