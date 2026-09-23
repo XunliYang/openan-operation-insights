@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { ApiError } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { useI18n } from '@/i18n/context';
+import type { I18nValue } from '@/i18n/context';
 import { IconAlert, IconInbox, IconRefresh } from '@/components/icons';
 
 export function EmptyState({
@@ -33,24 +35,34 @@ export function EmptyState({
   );
 }
 
-/** 错误码 → 面向用户的可读文案（与 03 文档 7.2 错误码表对齐） */
-function describeError(error: unknown): { title: string; hint: string } {
+/** 错误码 → 面向用户的可读文案（与 03 文档 7.2 错误码表对齐）；未知码用后端 message 原文兜底。 */
+function describeError(
+  error: unknown,
+  t: I18nValue['t'],
+): { title: string; hint: string } {
   if (error instanceof ApiError) {
     if (error.code === 50001) {
       return {
-        title: '数据源暂不可用',
-        hint: '后端数据文件校验未通过，运维正在修复；其余页面不受影响。',
+        title: t('common.error.dataUnavailable'),
+        hint: t('common.error.dataUnavailableHint'),
       };
     }
     if (error.code === -1) {
-      return { title: '无法连接后端服务', hint: '请确认 API 已在 :3000 启动，或检查网络与代理配置。' };
+      return {
+        title: t('common.error.backendUnreachable'),
+        hint: t('common.error.backendUnreachableHint'),
+      };
     }
-    return { title: error.message || '请求失败', hint: `错误码：${error.code}` };
+    // 未知错误码：title 用后端 message 原文兜底，仅本地化兜底文案与「错误码」hint。
+    return {
+      title: error.message || t('common.error.requestFailed'),
+      hint: t('common.error.errorCode', { code: error.code }),
+    };
   }
 
   return {
-    title: '加载失败',
-    hint: error instanceof Error ? error.message : '未知错误，请稍后重试。',
+    title: t('common.error.loadFailed'),
+    hint: error instanceof Error ? error.message : t('common.error.unknown'),
   };
 }
 
@@ -65,7 +77,8 @@ export function ErrorState({
   className?: string;
   compact?: boolean;
 }) {
-  const { title, hint } = describeError(error);
+  const { t } = useI18n();
+  const { title, hint } = describeError(error, t);
 
   return (
     <div
@@ -88,7 +101,7 @@ export function ErrorState({
           className="inline-flex items-center gap-2 rounded-lg border border-white/12 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-white/25 hover:bg-white/[0.09]"
         >
           <IconRefresh width={14} height={14} />
-          重新加载
+          {t('common.action.retry')}
         </button>
       ) : null}
     </div>

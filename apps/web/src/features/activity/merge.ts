@@ -1,4 +1,5 @@
 import type { Organization, OrganizationContribution, OrganizationInsight } from '@/types/contract';
+import type { Locale } from '@/i18n/types';
 
 /** 明细表行：组织档案为底表，GitHub 与 Confluence 两个数据源按 orgId 连接后的结果 */
 export interface ActivityRow {
@@ -113,12 +114,23 @@ export type SortKey =
   | 'requirements'
   | 'bestPractices';
 
-export function sortRows(rows: ActivityRow[], key: SortKey, direction: 'asc' | 'desc'): ActivityRow[] {
+/** 组织名称排序的 collation：中文用 zh-Hans-CN，英文用 en。 */
+const NAME_COLLATION: Record<Locale, string> = {
+  'zh-CN': 'zh-Hans-CN',
+  'en-US': 'en',
+};
+
+export function sortRows(
+  rows: ActivityRow[],
+  key: SortKey,
+  direction: 'asc' | 'desc',
+  locale: Locale = 'zh-CN',
+): ActivityRow[] {
   const factor = direction === 'asc' ? 1 : -1;
 
   return [...rows].sort((a, b) => {
     if (key === 'orgName') {
-      return a.orgName.localeCompare(b.orgName, 'zh-Hans-CN') * factor;
+      return a.orgName.localeCompare(b.orgName, NAME_COLLATION[locale]) * factor;
     }
     return (a[key] - b[key]) * factor;
   });

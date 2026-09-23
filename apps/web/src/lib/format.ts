@@ -1,14 +1,20 @@
-const NBSP_NARROW = '\u202f';
+import { createFormatters } from '@/i18n/formatters';
+import type { Formatters } from '@/i18n/formatters';
 
-/** 千分位；超过 10 万时以"万"为单位压缩，保留一位小数 */
+/**
+ * locale 相关的格式化委托给 i18n 内核注入的格式化器（默认 zh-CN）。
+ * 纯函数（formatCompact / formatDelta / daysUntil / toDateInput / fromDateInput /
+ * initialsOf）与 locale 无关，原样保留。所有导出名与签名不变，调用点零改动。
+ */
+let formatters: Formatters = createFormatters('zh-CN');
+
+/** 由 I18nProvider 在渲染时同步注入当前 locale 的格式化器。 */
+export function setFormatters(next: Formatters): void {
+  formatters = next;
+}
+
 export function formatNumber(value: number): string {
-  if (!Number.isFinite(value)) return '—';
-  const abs = Math.abs(value);
-  if (abs >= 100_000) {
-    const compact = (value / 10_000).toFixed(abs >= 1_000_000 ? 0 : 1);
-    return `${compact.replace(/\.0$/, '')}${NBSP_NARROW}万`;
-  }
-  return value.toLocaleString('zh-CN');
+  return formatters.formatNumber(value);
 }
 
 export function formatCompact(value: number): string {
@@ -24,40 +30,16 @@ export function formatDelta(delta?: number): string {
   return delta > 0 ? `+${formatNumber(delta)}` : formatNumber(delta);
 }
 
-const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  timeZone: 'UTC',
-});
-
-const DATETIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-});
-
 export function formatDate(iso?: string | null): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return DATE_FORMATTER.format(date);
+  return formatters.formatDate(iso);
 }
 
 export function formatDateTime(iso?: string | null): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return DATETIME_FORMATTER.format(date);
+  return formatters.formatDateTime(iso);
 }
 
 export function formatDateRange(start: string, end: string): string {
-  const startText = formatDate(start);
-  const endText = formatDate(end);
-  return startText === endText ? startText : `${startText} — ${endText}`;
+  return formatters.formatDateRange(start, end);
 }
 
 export function daysUntil(iso: string, now = Date.now()): number {
