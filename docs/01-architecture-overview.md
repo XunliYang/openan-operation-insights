@@ -328,7 +328,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | `VITE_API_BASE_URL` | 前端构建期 | ✅ | API 基地址，同域部署填 `/api` |
 | `VITE_MAP_BASEMAP` | 前端构建期 | ✅ | 地图底图模式 `street`/`outline`/`auto`，默认 `auto`（瓦片不可达自动回落矢量轮廓） |
-| `VITE_MAP_TILE_URL` | 前端构建期 | ✅ | 瓦片模板 URL，默认 CARTO dark；内网/离线部署可替换为内网瓦片服务，或配合 `outline` 关闭外部依赖 |
+| `VITE_MAP_TILE_URL` | 前端构建期 | ✅ | 瓦片模板 URL，默认 Esri `World_Dark_Gray_Base`（免密钥深色瓦片）；内网/离线部署可替换为内网瓦片服务，或配合 `outline` 关闭外部依赖 |
 | `PORT` | 后端运行时 | ❌ | NestJS 监听端口，默认 3000 |
 | `DATA_DIR` | 后端运行时 | ❌ | JSON 数据目录，默认 `<repo>/data` |
 | `CORS_ORIGINS` | 后端运行时 | ❌ | 非同域部署时的允许来源，逗号分隔 |
