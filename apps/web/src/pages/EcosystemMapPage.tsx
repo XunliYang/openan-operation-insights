@@ -16,7 +16,6 @@ import type { MapSource } from '@/types/contract';
 
 /** 默认数据源：生态参与者（S1 种子 source 之一，另一为 summit-attendees） */
 const DEFAULT_SOURCE_ID = 'ecosystem-participants';
-const MAP_HEIGHT = 520;
 
 /**
  * data/map-sources.manual.json 的条目结构示例。
@@ -125,7 +124,7 @@ export function EcosystemMapPage() {
         error={sourceQuery.error}
         onRetry={() => void sourceQuery.refetch()}
         skeleton={
-          <div className="h-[520px] animate-pulse rounded-2xl border border-white/10 bg-white/[0.02]" />
+          <div className="h-[clamp(320px,58vh,640px)] animate-pulse rounded-2xl border border-white/10 bg-white/[0.02]" />
         }
       >
         {source ? (
@@ -133,7 +132,6 @@ export function EcosystemMapPage() {
             <div className="min-w-0 lg:col-span-3">
               <MarkerMap
                 source={source}
-                height={MAP_HEIGHT}
                 selectedMarkerId={selectedMarkerId}
                 onSelectMarker={handleSelectMarker}
                 ariaLabel={`${MAP_COPY.pageTitle} · ${source.name}`}

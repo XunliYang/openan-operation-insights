@@ -1,0 +1,103 @@
+/* ── Leaflet 深色主题与 marker 态样式（MarkerMap 专用，随组件按需加载） ── */
+
+.openan-map {
+  background: #0a0e1b;
+  font-family: inherit;
+}
+
+.openan-map--picking {
+  cursor: crosshair;
+}
+
+/* 署名：深色半透明，仍保持可见（OSM/CARTO 署名要求） */
+.openan-map .leaflet-control-attribution {
+  background: rgba(8, 11, 22, 0.64);
+  color: #64748b;
+  font-size: 10px;
+}
+.openan-map .leaflet-control-attribution a {
+  color: #94a3b8;
+}
+
+/* 标记图标：去掉 Leaflet 默认 div 图标的白底边框 */
+.openan-marker-icon {
+  background: transparent;
+  border: none;
+}
+
+.openan-marker-shift {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transition: filter 0.15s ease;
+}
+
+/* logo 图标：按真实宽高比，深色底板 + 细边框 */
+.openan-marker-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  line-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(10, 14, 27, 0.88);
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.85);
+}
+.openan-marker-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 圆形首字母徽标（logo 缺失/加载失败降级，与 Avatar 语义同源） */
+.openan-marker-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #4b96ff, #1bc4ac);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 6px 14px -4px rgba(0, 0, 0, 0.7);
+}
+
+/* 计数簇徽标：环形放不下的同点组折叠态 */
+.openan-marker-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1.5px solid #3fdcc6;
+  box-shadow:
+    0 0 0 3px rgba(63, 220, 198, 0.2),
+    0 8px 20px -6px rgba(0, 0, 0, 0.8);
+}
+
+/* 选中态外圈：accent 描边（与旧 ECharts emphasis 观感一致） */
+.openan-marker-icon.is-selected .openan-marker-logo,
+.openan-marker-icon.is-selected .openan-marker-badge {
+  border-color: #3fdcc6;
+  box-shadow:
+    0 0 0 2px rgba(63, 220, 198, 0.55),
+    0 0 16px 0 rgba(63, 220, 198, 0.45);
+}
+
+/* 悬停轻微提亮 */
+.openan-marker-icon:hover .openan-marker-shift {
+  filter: brightness(1.15);
+}

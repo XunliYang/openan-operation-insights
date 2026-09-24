@@ -1,7 +1,6 @@
 import * as echarts from 'echarts/core';
-import { BarChart, PieChart, ScatterChart } from 'echarts/charts';
+import { BarChart, PieChart } from 'echarts/charts';
 import {
-  GeoComponent,
   GraphicComponent,
   GridComponent,
   LegendComponent,
@@ -13,8 +12,6 @@ import { CanvasRenderer } from 'echarts/renderers';
 echarts.use([
   PieChart,
   BarChart,
-  ScatterChart,
-  GeoComponent,
   GraphicComponent,
   GridComponent,
   TooltipComponent,
