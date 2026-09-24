@@ -54,6 +54,7 @@ flowchart TB
 | `ActivityModule` | `ActivityController` | `ActivityService` | `CONTRIBUTION_PORT`、`INSIGHT_PORT` | 贡献明细、成果洞察、贡献聚合 |
 | `SummitModule` | `SummitController` | `SummitService` | `SUMMIT_PORT` | 峰会列表、时间线、详情 |
 | `MeetingModule` | `MeetingController` | `MeetingService` | `MEETING_ATTENDANCE_PORT` | 例会参会矩阵（**纯透传**，无口径计算） |
+| `MapModule` | `MapController` | `MapService` | `MAP_PORT` | 地图数据源列表/详情（内置种子 + 人工叠加合并），以及人工层写接口（**受令牌保护，默认关闭**） |
 | `ProvidersModule` | — | — | — | 集中声明所有端口 Token → 适配器类的绑定；当前六个端口**恒为 JSON 实现**，采集不经此切换（见 2.3 节） |
 | `RepositoriesModule` | — | — | — | 提供 `JsonRepository<T>` 实例（按文件名注入） |
 | `CommonModule` | — | — | — | 全局响应拦截器、异常过滤器、错误码枚举 |
@@ -528,6 +529,8 @@ export class ListSummitsQueryDto {
 | `40001` | 400 | `VALIDATION_FAILED` | DTO 校验未通过 | 提示 `message` |
 | `40002` | 400 | `INVALID_DATE_RANGE` | `from` 晚于 `to` 或格式非法 | 提示并重置筛选 |
 | `40003` | 400 | `INVALID_YEAR` | 年份超出允许范围 | 重置筛选 |
+| `40300` | 403 | `FORBIDDEN` | 写接口令牌缺失或不匹配（`X-Admin-Token`） | 提示「管理员令牌无效」 |
+| `40301` | 403 | `WRITE_DISABLED` | 写接口未启用（`MAP_WRITE_TOKEN` 未配置） | 提示「写入未启用，当前只读」 |
 | `40400` | 404 | `RESOURCE_NOT_FOUND` | 通用资源不存在 | 展示空态 |
 | `40401` | 404 | `ORGANIZATION_NOT_FOUND` | 组织不存在 | 展示空态 + 返回列表 |
 | `40402` | 404 | `SUMMIT_NOT_FOUND` | 峰会不存在 | 展示空态 + 返回时间线 |
@@ -584,6 +587,7 @@ export class ListSummitsQueryDto {
 | `GITHUB_ORGS` | 否 | — | 待采集组织，逗号分隔 |
 | `GITHUB_REPOS` | 否 | — | 可选，显式指定仓库白名单 |
 | `GITHUB_LOOKBACK_DAYS` | 否 | `3650` | **兜底**回溯窗口；仅当本地游标缺失/损坏时生效，正常增量以 `lastSyncAt` 为准 |
+| `MAP_WRITE_TOKEN` | 否 | — | 地图人工层写接口令牌；**未配置（空）时写接口只读**（`POST/PUT/DELETE /api/maps/:sourceId/markers[/:markerId]` 一律 `40301`）。配置后请求头 `X-Admin-Token` 必须与此值一致 |
 | `CONFLUENCE_BASE_URL` | 否 | — | Confluence 站点地址 |
 | `CONFLUENCE_TOKEN` | 否 | — | Confluence API Token |
 | `CONFLUENCE_SPACES` | 否 | — | 待采集空间 Key，逗号分隔 |

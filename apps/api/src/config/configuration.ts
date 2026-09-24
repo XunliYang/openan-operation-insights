@@ -55,6 +55,8 @@ export interface AppConfig {
   corsOrigins: string[];
   cacheTtlSeconds: number;
   logLevel: string;
+  /** 地图人工层写接口令牌；未配置（空）时写接口只读（40301 WRITE_DISABLED） */
+  mapWriteToken: string;
   github: GithubConfig;
 }
 
@@ -78,6 +80,7 @@ export default (): AppConfig => {
       .filter((origin) => origin.length > 0),
     cacheTtlSeconds: toNumber(process.env.CACHE_TTL_SECONDS, 300),
     logLevel: process.env.LOG_LEVEL?.trim() || 'log',
+    mapWriteToken: process.env.MAP_WRITE_TOKEN?.trim() ?? '',
     github: {
       token: process.env.GITHUB_TOKEN?.trim() ?? '',
       orgs: splitList(process.env.GITHUB_ORGS),
