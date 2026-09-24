@@ -139,6 +139,15 @@ export type MapScenario = 'ecosystem' | 'co-creation' | 'summit';
 export type MapScope = 'world' | 'china';
 export type MarkerOrigin = 'builtin' | 'manual';
 
+export type ParticipantCategory =
+  | 'operator'          // 运营商
+  | 'equipment-vendor'  // 设备商
+  | 'integrator'        // 集成商
+  | 'it-vendor'         // IT 厂商
+  | 'cloud-vendor'      // 云厂商
+  | 'research'          // 研究机构
+  | 'other';            // 未分类（人工条目未填时的兜底，前端必须能渲染）
+
 export interface MapMarker {
   markerId: string;
   label: string;
@@ -152,6 +161,8 @@ export interface MapMarker {
   group?: string;
   orgId?: string | null;
   description?: string;
+  /** 六类分类 + 未分类兜底；响应体必定有值，入库校验允许缺省，合并时归一化为 'other' */
+  category: ParticipantCategory;
   origin: MarkerOrigin;
 }
 

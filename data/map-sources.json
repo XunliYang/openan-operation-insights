@@ -22,6 +22,7 @@
           "locationLabel": "Beijing, China",
           "orgId": "cmcc",
           "description": "OpenAN 社区主席",
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -36,6 +37,7 @@
           "locationLabel": "Shenzhen, China",
           "orgId": "huawei",
           "description": "OpenAN 社区副主席",
+          "category": "equipment-vendor",
           "origin": "builtin"
         },
         {
@@ -50,6 +52,7 @@
           "locationLabel": "Paris, France",
           "orgId": "orange",
           "description": "",
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -64,6 +67,7 @@
           "locationLabel": "Shenzhen, China",
           "orgId": "zte",
           "description": "",
+          "category": "equipment-vendor",
           "origin": "builtin"
         },
         {
@@ -78,6 +82,7 @@
           "locationLabel": "Bangkok, Thailand",
           "orgId": "ais",
           "description": "",
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -92,6 +97,7 @@
           "locationLabel": "Bengaluru, India",
           "orgId": "infosys",
           "description": "",
+          "category": "integrator",
           "origin": "builtin"
         },
         {
@@ -106,6 +112,7 @@
           "locationLabel": "Beijing, China",
           "orgId": "asiainfo",
           "description": "",
+          "category": "integrator",
           "origin": "builtin"
         },
         {
@@ -120,6 +127,7 @@
           "locationLabel": "Buenos Aires, Argentina",
           "orgId": "personal",
           "description": "",
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -134,6 +142,7 @@
           "locationLabel": "Kuwait City, Kuwait",
           "orgId": "zain",
           "description": "",
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -148,6 +157,7 @@
           "locationLabel": "Jinan, China",
           "orgId": "inspur",
           "description": "",
+          "category": "it-vendor",
           "origin": "builtin"
         }
       ]
@@ -171,6 +181,7 @@
           "locationLabel": "Vancouver, Canada",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -184,6 +195,7 @@
           "locationLabel": "Tokyo, Japan",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -197,6 +209,7 @@
           "locationLabel": "Tokyo, Japan",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -210,6 +223,7 @@
           "locationLabel": "Tokyo, Japan",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -223,6 +237,7 @@
           "locationLabel": "Tokyo, Japan",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -236,6 +251,7 @@
           "locationLabel": "Hanoi, Vietnam",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -249,6 +265,7 @@
           "locationLabel": "New Delhi, India",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -262,6 +279,7 @@
           "locationLabel": "Colombo, Sri Lanka",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         },
         {
@@ -275,6 +293,7 @@
           "locationLabel": "Bonn, Germany",
           "group": "attendee",
           "orgId": null,
+          "category": "operator",
           "origin": "builtin"
         }
       ]

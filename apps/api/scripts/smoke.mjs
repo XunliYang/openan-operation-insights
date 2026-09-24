@@ -4,6 +4,17 @@
  */
 const BASE = process.env.API_BASE ?? 'http://localhost:3000/api';
 
+/** 六类 + 未分类兜底（与后端 validators / DTO 口径一致） */
+const CATEGORIES = [
+  'operator',
+  'equipment-vendor',
+  'integrator',
+  'it-vendor',
+  'cloud-vendor',
+  'research',
+  'other',
+];
+
 const cases = [
   { name: '首页汇总', path: '/home/summary', expect: (d) => d.partnerCount && 'nextSummit' in d },
   { name: '贡献组织卡片', path: '/organizations?scope=contributing', expect: (d) => Array.isArray(d) },
@@ -19,8 +30,27 @@ const cases = [
   { name: '非法排序字段→40001', path: '/contributions?sortBy=oops', expectError: 40001 },
   { name: '非法年份→40003', path: '/summits?year=1999', expectError: 40003 },
   { name: '地图源列表', path: '/maps', expect: (d) => Array.isArray(d) && d.some((s) => s.sourceId === 'ecosystem-participants') },
+  { name: '地图写能力(未配置令牌→只读)', path: '/maps/capabilities', expect: (d) => d.writable === false },
   { name: '地图生态源', path: '/maps/ecosystem-participants', expect: (d) => Array.isArray(d.markers) && d.markers.length >= 10 },
+  { name: '地图生态源分类齐全', path: '/maps/ecosystem-participants', expect: (d) => Array.isArray(d.markers) && d.markers.length === 10 && d.markers.every((m) => CATEGORIES.includes(m.category)) },
   { name: '地图源不存在→40400', path: '/maps/not-exist', expectError: 40400 },
+  {
+    name: '地图写接口禁用→40301',
+    path: '/maps/ecosystem-participants/markers',
+    init: {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markerId: 'smoke-test',
+        label: 'Smoke Test',
+        countryCode: 'US',
+        countryName: 'United States',
+        longitude: -74.01,
+        latitude: 40.71,
+      }),
+    },
+    expectError: 40301,
+  },
 ];
 
 let failed = 0;
@@ -28,7 +58,7 @@ let failed = 0;
 for (const testCase of cases) {
   const url = `${BASE}${testCase.path}`;
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, testCase.init);
     const body = await response.json();
 
     if (testCase.expectError !== undefined) {

@@ -3,7 +3,7 @@ import { MapSource, MapSourceSummary } from '../../contract/entities';
 import { ErrorCode } from '../../common/constants/error-code';
 import { DomainException } from '../../common/exceptions/domain.exception';
 import { MAP_PORT, ORGANIZATION_PORT } from '../../providers/tokens';
-import { MapPort } from '../../providers/ports/map.port';
+import { ManualMarkerInput, MapPort } from '../../providers/ports/map.port';
 import { OrganizationPort } from '../../providers/ports/organization.port';
 
 @Injectable()
@@ -19,12 +19,37 @@ export class MapService {
     return this.maps.listSources();
   }
 
+  isWritable(): boolean {
+    return this.maps.isWritable();
+  }
+
   async getSource(sourceId: string): Promise<MapSource> {
     const source = await this.maps.getSource(sourceId);
     if (!source) {
       throw new DomainException(ErrorCode.RESOURCE_NOT_FOUND, `地图数据源不存在：${sourceId}`);
     }
     await this.warnDanglingOrgIds(source);
+    return source;
+  }
+
+  /** 新增或覆盖人工层标记（同 markerId 覆盖）；未知 source → 40400 */
+  async upsertManualMarker(sourceId: string, marker: ManualMarkerInput): Promise<MapSource> {
+    const source = await this.maps.upsertManualMarker(sourceId, marker);
+    if (!source) {
+      throw new DomainException(ErrorCode.RESOURCE_NOT_FOUND, `地图数据源不存在：${sourceId}`);
+    }
+    return source;
+  }
+
+  /** 仅删除人工层条目；内置 seed 不可删（未知/不可删 → 40400） */
+  async deleteManualMarker(sourceId: string, markerId: string): Promise<MapSource> {
+    const source = await this.maps.deleteManualMarker(sourceId, markerId);
+    if (!source) {
+      throw new DomainException(
+        ErrorCode.RESOURCE_NOT_FOUND,
+        `标记不存在或不可删除：${markerId}（内置种子只能覆盖或恢复默认，不能删除）`,
+      );
+    }
     return source;
   }
 

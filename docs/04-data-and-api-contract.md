@@ -285,6 +285,57 @@ erDiagram
 
 ---
 
+### 3.9 地图域：`MapMarker` / `MapSource` / `MapSourceSummary`
+
+> 地图域（`data/map-sources.json` + `data/map-sources.manual.json`）独立于组织档案：marker **自描述**（label / logo / 坐标内联），`orgId` 仅为**可选回链**，以支撑「参会地图」等无组织档案的场景复用。
+
+`ParticipantCategory`（六类 + 未分类兜底）：
+
+| 值 | 含义 |
+| --- | --- |
+| `operator` | 运营商 |
+| `equipment-vendor` | 设备商 |
+| `integrator` | 集成商 |
+| `it-vendor` | IT 厂商 |
+| `cloud-vendor` | 云厂商 |
+| `research` | 研究机构 |
+| `other` | 未分类（人工条目未填时的兜底，前端必须能渲染） |
+
+`MapMarker`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `markerId` | string | ✅ | 主键（kebab-case）；内置用 `orgId`，人工可自定义 |
+| `label` | string | ✅ | 展示名 |
+| `logoUrl` | string | ✅ | 空串 → 前端降级为字母色块；否则 `http(s)://` 或 `/` 开头 |
+| `homepageUrl` | string | ❌ | 官网地址，仅 `http(s)://` |
+| `countryCode` | string | ✅ | ISO 3166-1 alpha-2，如 `CN` |
+| `countryName` | string | ✅ | 国家/地区名 |
+| `longitude` | number | ✅ | WGS84 经度，-180…180 |
+| `latitude` | number | ✅ | WGS84 纬度，-90…90 |
+| `locationLabel` | string | ❌ | 如 `Beijing, China` |
+| `group` | string | ❌ | 预留分组（如 `attendee`） |
+| `orgId` | string \| null | ❌ | 有值时前端回链组织档案 |
+| `description` | string | ❌ | 简介 |
+| `category` | `ParticipantCategory` | ✅ | 六类分类 + 未分类兜底。响应体**必定有值**；入库校验允许缺省，合并时归一化为 `other` |
+| `origin` | `'builtin' \| 'manual'` | ✅ | 由合并逻辑写入：内置项 `builtin`，人工项 `manual`；入库存值校验，缺失合法（也会被合并逻辑覆写） |
+
+`MapSource`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `sourceId` | string | ✅ | 生态地图 = `ecosystem-participants` |
+| `name` | string | ✅ | 展示名 |
+| `description` | string | ❌ | 说明 |
+| `scenario` | `'ecosystem' \| 'co-creation' \| 'summit'` | ✅ | 场景 |
+| `mapScope` | `'world' \| 'china'` | ✅ | 底图范围 |
+| `markers` | `MapMarker[]` | ✅ | 合并排序后的标记（`countryName` 升序、`label` 升序） |
+| `updatedAt` | string | ✅ | **数据更新时间**：合并结果取内置种子 `updatedAt` 与人工层 `updatedAt` 中**较晚者**——人工层每次写入都会刷新自己的 `updatedAt`，因此人工叠加后「数据更新于」随之刷新 |
+
+`MapSourceSummary`（`GET /api/maps` 条目）：`sourceId` / `name` / `description` / `scenario` / `mapScope` / `markerCount`（合并后条数）/ `updatedAt`。
+
+---
+
 ## 4. 数据文件样例
 
 以下样例即为**本阶段的硬编码数据源**，实现时直接以此结构创建文件。所有样例数据均为示意值，可在维护时替换。
@@ -651,6 +702,12 @@ erDiagram
 | 7 | GET | `/api/summits/:id` | 单场峰会详情 | 参会情况（预留跳转） |
 | 8 | GET | `/api/contributor-contributions` | 个人 GitHub 维度贡献 | 社区活跃度（个人贡献排行） |
 | 9 | GET | `/api/meetings` | 例会参会矩阵（人 × 日期） | 例会参会情况 |
+| 10 | GET | `/api/maps` | 地图数据源汇总 | 生态地图 |
+| 11 | GET | `/api/maps/:sourceId` | 单数据源（合并后的 markers） | 生态地图 |
+| 12 | GET | `/api/maps/capabilities` | 地图写能力查询 | 生态地图（卡片编辑） |
+| 13 | POST | `/api/maps/:sourceId/markers` | 新增人工层标记（受令牌保护） | 生态地图（卡片编辑） |
+| 14 | PUT | `/api/maps/:sourceId/markers/:markerId` | 覆盖人工层标记（受令牌保护） | 生态地图（卡片编辑） |
+| 15 | DELETE | `/api/maps/:sourceId/markers/:markerId` | 删除人工层标记（受令牌保护） | 生态地图（卡片编辑） |
 
 ### 5.3 接口详细定义
 
@@ -971,6 +1028,55 @@ erDiagram
 **校验规则**：`attendance.length !== columns.length`，或 `date` 不匹配 `YYYY-MM-DD` → `50001`（数据文件结构损坏，语义同 5.3.1）。该校验由采集器在落盘前保证，接口层仅做防御性检查。
 
 **失败场景**：`50001`（`meetings.json` 缺失或结构损坏）。
+
+---
+
+#### 5.3.10 `GET /api/maps` / `GET /api/maps/:sourceId`
+
+**用途**：生态地图的数据源列表与单源详情（内置种子 + 人工叠加合并后的完整 `MapSource`）。
+
+- `GET /api/maps` → `MapSourceSummary[]`；
+- `GET /api/maps/:sourceId` → `MapSource`；未知 source → `40400`。
+
+#### 5.3.11 地图写能力与人工层写接口
+
+**鉴权（ADR-0008）**：写接口受 `MAP_WRITE_TOKEN` 保护。`GET /api/maps/capabilities` **无需令牌**；三个写接口要求请求头 `X-Admin-Token` 与 `MAP_WRITE_TOKEN` 精确一致（`timingSafeEqual` 比较）。
+
+- `MAP_WRITE_TOKEN` **未配置** → 三个写接口一律 `403` / `40301 WRITE_DISABLED`，`GET /api/maps/capabilities` 返回 `{ "writable": false }`。**默认部署是只读的，这是有意的。**
+- 已配置但头缺失/不匹配 → `403` / `40300 FORBIDDEN`。
+
+| 接口 | 请求体 | 响应 `data` | 语义 |
+| --- | --- | --- | --- |
+| `GET /api/maps/capabilities` | — | `{ writable: boolean }` | 写能力查询 |
+| `POST /api/maps/:sourceId/markers` | `UpsertMapMarkerDto`（含 `markerId`） | 合并后的完整 `MapSource` | 新增人工层标记 |
+| `PUT /api/maps/:sourceId/markers/:markerId` | `UpsertMapMarkerDto`（不含 `markerId`，从路径取） | 合并后的完整 `MapSource` | 覆盖内置或人工标记（同 `markerId`） |
+| `DELETE /api/maps/:sourceId/markers/:markerId` | — | 合并后的完整 `MapSource` | 删除人工层标记 |
+
+**`UpsertMapMarkerDto` 字段校验**（全局 `whitelist + forbidNonWhitelisted`，未声明的 `origin` / `sourceId` 等字段一律 `40001`）：
+
+| 字段 | 规则 |
+| --- | --- |
+| `markerId` | 仅 POST 必填，`^[a-z0-9][a-z0-9-]{1,63}$`；PUT 从路径取，body 里出现即 `40001` |
+| `label` | 必填，1–80 |
+| `logoUrl` | 可选；空串允许；否则必须 `http(s)://` 或 `/` 开头 |
+| `homepageUrl` | 可选；只允许 `http(s)://`（不接受 `javascript:` 等其它 scheme） |
+| `countryCode` | 必填，`^[A-Z]{2}$` |
+| `countryName` | 必填，1–64 |
+| `longitude` | 必填，-180…180 |
+| `latitude` | 必填，-90…90 |
+| `locationLabel` | 可选，≤80 |
+| `category` | 可选，六类 + `other`；缺省归一化为 `other` |
+| `description` | 可选，≤500 |
+| `orgId` | 可选，`string \| null` |
+
+**合并与删除语义**：
+
+- 写入口 `origin` 一律写 `manual`；请求体带的 `origin` / `sourceId` 不采信（白名单拒绝）。
+- 未知 `sourceId` → `40400`；`POST` 不会新增 source。
+- `DELETE` 只能删**人工层**条目；内置种子**不可删除**（`DELETE` 内置 `markerId` → `40400`，可用 `PUT` 覆盖或删除人工层条目以「恢复默认」）。
+- 写入后读路径立即可见（不依赖 15 秒 TTL）；写接口响应 `Cache-Control: no-store`。
+
+**失败场景**：未知 source / 不可删 markerId → `40400`；DTO 校验失败 → `40001`；未授权 → `40300`；写未启用 → `40301`。
 
 ---
 

@@ -201,6 +201,15 @@ export function isHomeFileData(value: unknown): value is HomeFileData {
 const MAP_SCENARIOS = ['ecosystem', 'co-creation', 'summit'];
 const MAP_SCOPES = ['world', 'china'];
 const MARKER_ORIGINS = ['builtin', 'manual'];
+const PARTICIPANT_CATEGORIES = [
+  'operator',
+  'equipment-vendor',
+  'integrator',
+  'it-vendor',
+  'cloud-vendor',
+  'research',
+  'other',
+];
 
 export function isMapMarker(value: unknown): value is MapMarker {
   if (!isObject(value)) return false;
@@ -217,7 +226,10 @@ export function isMapMarker(value: unknown): value is MapMarker {
     (value.group === undefined || isString(value.group)) &&
     (value.orgId === undefined || value.orgId === null || isString(value.orgId)) &&
     (value.description === undefined || isString(value.description)) &&
-    MARKER_ORIGINS.includes(String(value.origin))
+    // category 入库允许缺省（合并时归一化为 'other'），有值时必须在白名单内
+    (value.category === undefined || PARTICIPANT_CATEGORIES.includes(String(value.category))) &&
+    // origin 入库可选：由合并逻辑覆写，入口不再强制校验（缺省合法；有值时仍在白名单内）
+    (value.origin === undefined || MARKER_ORIGINS.includes(String(value.origin)))
   );
 }
 
