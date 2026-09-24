@@ -29,7 +29,8 @@ export interface MarkerMapProps {
 
 const BASE_URL = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
 const WORLD_GEO_URL = `${BASE_URL}/map/world.json`;
-const DEFAULT_TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const DEFAULT_TILE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
 const MIN_ZOOM = 2;
 const MAX_ZOOM = 19;
 /** 移动端 map 容器高度：58vh，夹在 [320, 640]；桌面高屏时即 640 */

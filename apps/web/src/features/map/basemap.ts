@@ -3,7 +3,7 @@ import * as L from 'leaflet';
 /**
  * 底图策略的 seam（ADR-0006）：Leaflet 瓦片层 / 本地矢量轮廓层，及二者的自动回落。
  *
- * - `street`：瓦片底图（默认 CARTO dark，可经 VITE_MAP_TILE_URL 换成内网瓦片服务）。
+ * - `street`：瓦片底图（默认 Esri World_Dark_Gray_Base，可经 VITE_MAP_TILE_URL 换成内网瓦片服务）。
  * - `outline`：本地 `map/world.json` 矢量轮廓（离线兜底，深色观感沿用旧 ECharts geo）。
  * - `auto`：先挂 street，收到首个 `tileerror` 时切到 outline 并回调 onTileUnavailable。
  *
@@ -35,7 +35,8 @@ const OUTLINE_STYLE: L.PathOptions = {
   fillOpacity: 1,
 };
 
-const TILE_ATTRIBUTION = '© OpenStreetMap contributors © CARTO';
+const TILE_ATTRIBUTION =
+  'Powered by <a href="https://www.esri.com/" target="_blank" rel="noopener noreferrer">Esri</a> — Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community';
 
 export function createBasemap(map: L.Map, opts: BasemapOptions): BasemapHandle {
   const { tileUrl, worldGeoUrl, onTileUnavailable } = opts;
@@ -50,7 +51,6 @@ export function createBasemap(map: L.Map, opts: BasemapOptions): BasemapHandle {
 
   function buildTileLayer(): L.TileLayer {
     return L.tileLayer(tileUrl, {
-      subdomains: 'abcd',
       maxZoom: 19,
       attribution: TILE_ATTRIBUTION,
     });

@@ -5,7 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
   /** 地图底图模式：street | outline | auto，默认 auto（瓦片不可达自动回落矢量轮廓） */
   readonly VITE_MAP_BASEMAP?: string;
-  /** 瓦片模板 URL，默认 CARTO dark（{s}/{z}/{x}/{y}/{r} 占位符） */
+  /** 瓦片模板 URL，默认 Esri World_Dark_Gray_Base（{z}/{y}/{x} 占位符） */
   readonly VITE_MAP_TILE_URL?: string;
 }
 

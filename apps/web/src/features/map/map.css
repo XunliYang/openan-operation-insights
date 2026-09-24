@@ -9,7 +9,7 @@
   cursor: crosshair;
 }
 
-/* 署名：深色半透明，仍保持可见（OSM/CARTO 署名要求） */
+/* 署名：深色半透明，仍保持可见（Esri 署名要求） */
 .openan-map .leaflet-control-attribution {
   background: rgba(8, 11, 22, 0.64);
   color: #64748b;
