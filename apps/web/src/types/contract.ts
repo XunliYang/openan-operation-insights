@@ -187,6 +187,30 @@ export interface MapSourceSummary {
   updatedAt: string;
 }
 
+/** `GET /api/maps/capabilities` 响应：写接口是否已启用（后端 MAP_WRITE_TOKEN 已配置） */
+export interface MapCapabilities {
+  writable: boolean;
+}
+
+/**
+ * 写接口请求体（POST/PUT /api/maps/:sourceId/markers）。
+ * 与后端 UpsertMapMarkerDto 逐字段对齐；`markerId` 仅 POST 时在请求体提供、
+ * PUT 从路径取，`origin`/`sourceId` 由后端写入、不在此声明。
+ */
+export interface UpsertMarkerBody {
+  label: string;
+  logoUrl?: string;
+  homepageUrl?: string;
+  countryCode: string;
+  countryName: string;
+  longitude: number;
+  latitude: number;
+  locationLabel?: string;
+  category?: ParticipantCategory;
+  description?: string;
+  orgId?: string | null;
+}
+
 /**
  * 例会参会矩阵（ADR-0005 / 04 文档 §3.8）—— 无主键、无规范化、无聚合。
  * 直接照搬运营台账：列为人名原文（保留原序），行为日期，格子表示是否出席。
