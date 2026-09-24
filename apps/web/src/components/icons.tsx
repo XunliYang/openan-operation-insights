@@ -133,6 +133,13 @@ export const IconPin = (props: IconProps) => (
   </svg>
 );
 
+export const IconMap = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="m3 6.5 6-2.8 6 2.8 6-2.8v14l-6 2.8-6-2.8-6 2.8z" />
+    <path d="M9 3.7v14M15 6.5v14" />
+  </svg>
+);
+
 export const IconClock = (props: IconProps) => (
   <svg {...base(props)}>
     <circle cx="12" cy="12" r="9" />
