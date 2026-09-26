@@ -25,5 +25,6 @@ export const queryKeys = {
   summitDetail: (id: string) => ['summits', 'detail', id] as const,
   mapSources: () => ['maps'] as const,
   mapSource: (sourceId: string) => ['maps', sourceId] as const,
+  mapCapabilities: () => ['maps', 'capabilities'] as const,
   meetings: ['meetings'] as const,
 };

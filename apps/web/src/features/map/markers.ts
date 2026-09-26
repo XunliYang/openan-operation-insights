@@ -49,3 +49,38 @@ export function groupMarkersByCountry(markers: MapMarker[]): CountryGroup[] {
         a.countryName.localeCompare(b.countryName) || a.countryCode.localeCompare(b.countryCode),
     );
 }
+
+/** 同点判定阈值（度），与 marker-layout.ts 的 SAME_POINT_EPSILON_DEG 对齐 */
+const SAME_POINT_EPSILON_DEG = 1e-4;
+
+export interface SamePointGroup {
+  longitude: number;
+  latitude: number;
+  markers: MapMarker[];
+}
+
+/**
+ * 把同一国家（调用方先按国家分组）内坐标重合的 marker 归组，
+ * 供清单「N 个同点」折叠 + 展开使用（与地图环形/计数簇语义对应）。
+ * 组内按 label 升序（稳定）。
+ */
+export function groupMarkersBySamePoint(markers: MapMarker[]): SamePointGroup[] {
+  const groups: SamePointGroup[] = [];
+  const assigned = new Set<string>();
+
+  for (const marker of markers) {
+    if (assigned.has(marker.markerId)) continue;
+    const peers = markers
+      .filter(
+        (m) =>
+          !assigned.has(m.markerId) &&
+          Math.abs(m.longitude - marker.longitude) < SAME_POINT_EPSILON_DEG &&
+          Math.abs(m.latitude - marker.latitude) < SAME_POINT_EPSILON_DEG,
+      )
+      .sort((a, b) => a.label.localeCompare(b.label));
+    peers.forEach((m) => assigned.add(m.markerId));
+    groups.push({ longitude: marker.longitude, latitude: marker.latitude, markers: peers });
+  }
+
+  return groups;
+}

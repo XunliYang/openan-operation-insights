@@ -201,3 +201,25 @@ export const IconFilter = (props: IconProps) => (
     <path d="M4 6h16M7 12h10M10 18h4" />
   </svg>
 );
+
+export const IconPlus = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+export const IconEdit = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M4 20h4.2L20 8.2a2.1 2.1 0 0 0-3-3L5.2 17z" />
+    <path d="m14.5 6.5 3 3" />
+  </svg>
+);
+
+export const IconTrash = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M4 7h16" />
+    <path d="M9 7V4.8A1.8 1.8 0 0 1 10.8 3h2.4A1.8 1.8 0 0 1 15 4.8V7" />
+    <path d="m6.5 7 1 13h9l1-13" />
+    <path d="M10 11v5M14 11v5" />
+  </svg>
+);
